@@ -1,0 +1,5 @@
+{
+    "configuration": "usb=serial2,speed=600,opt=o2std,keys=en-us",
+    "board": "teensy:avr:teensy40",
+    "sketch": "ICOM_IC-905_CIV.ino"
+}
