@@ -22,9 +22,7 @@ The IC-905 USB port has 2 serial ports and USB audio on it.  One is CI-V for CAT
 As an option, a PC can be connected to the Teensy main USB port. The 2 radio serial ports are passed on to the PC. The PC connection is not required, this will operate standalone. The T4 CPU can be packaged in a very small box with a short USB cable to the radio.  Inside would be suitable buffers. Connectors added to control some combo of relays and amps. Long wires may then be run to the equipment including all the way up to the antenna, wherever that may be.
 
 Could generate PTT (aka SEND) from the CI-V messages and combine in software for per-band PTT outputs.  
-I have seen some say they identified and broke out the 'SEND" or PTT signal on the RF unit cable but still band specific filtering.
-Ideally the RF Unit would have band decode IO signals available using some of its spare accessory connector pins.  These pins are "Do Not Connect" 
-suggesing they may be connected to something inside for future use.
+I have seen some say they identified and broke out the 'SEND" or PTT signal on the RF unit cable but still need band specific filtering.  Somehow the RF Unit needs to know what band to operate on so some sort of data exchange is likely over the cable from the control head.  I have never looked at it. Ideally the RF Unit would have band decode IO signals available using some of its spare accessory connector pins.  These pins are noted as "Do Not Connect" suggesting they may be connected to something inside for future use.
 
 Leverages CI-V portion of band decoder code from RemoteTH.com and heavily modified - see source file for more info
 
