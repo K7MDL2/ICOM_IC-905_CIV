@@ -76,16 +76,18 @@ USBHIDParser hid1(myusb);
 USBHIDParser hid2(myusb);
 //USBHIDParser hid3(myusb);
 
-// There is now two versions of the USBSerial class, that are both derived from a common Base class
+// There are now two versions of the USBSerial class, that are both derived from a common Base class
 // The difference is on how large of transfers that it can handle.  This is controlled by
 // the device descriptor, where up to now we handled those up to 64 byte USB transfers.
 // But there are now new devices that support larger transfer like 512 bytes.  This for example
 // includes the Teensy 4.x boards.  For these we need the big buffer version. 
 // uncomment one of the following defines for userial
-USBSerial userial(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
-USBSerial userial1(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
-//USBSerial_BigBuffer userial(myusb, 1); // Handles anything up to 512 bytes
+//USBSerial userial(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
+//USBSerial userial1(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
+USBSerial_BigBuffer userial(myusb, 1); // Handles anything up to 512 bytes
+USBSerial_BigBuffer userial1(myusb, 1); // Handles anything up to 512 bytes
 //USBSerial_BigBuffer userial(myusb); // Handles up to 512 but by default only for those > 64 bytes
+//USBSerial_BigBuffer userial1(myusb); // Handles up to 512 but by default only for those > 64 bytes
 
 USBDriver *drivers[] = {&hub1, &hub2, &hid1, &hid2, &userial, &userial1};
 #define CNT_DEVICES (sizeof(drivers)/sizeof(drivers[0]))
@@ -96,9 +98,12 @@ Metro CAT_Poll = Metro(1000);     // Throttle the servicing for CAT comms
 bool Proceed  = false; 
 int   counter = 0;
 
+#define DISP_FREQ
+#define GPS
 #define PC_CAT_port Serial
 //#define PC_CAT_port SerialUSB1
-//#define PC_GPS_port SerialUSB2
+#define PC_GPS_port SerialUSB1
+#define PC_Debug_port SerialUSB2
 
 int fromAdress = 0xE0;              // 0E
 byte rdI[12];   //read data icom
@@ -231,8 +236,8 @@ Outputs
 #define SERBAUD     115200     // [baud] Serial port in/out baudrate
 #define WATCHDOG        20     // [sec] determines the time, after which the all relay OFF, if missed next input data - uncomment for the enabled
 #define REQUEST        500    // [ms] use TXD output for sending frequency request
-#define CIV_ADRESS    0xA4    // CIV input HEX Icom adress (0x is prefix)
-#define CIV_ADR_OUT   0xA4    // CIV output HEX Icom adress (0x is prefix)
+#define CIV_ADRESS    0xAC    // CIV input HEX Icom adress (0x is prefix)
+#define CIV_ADR_OUT   0xAC    // CIV output HEX Icom adress (0x is prefix)
 // #define DISABLE_DIVIDER    // for lowest voltage D-SUB pin 13 inputs up to 5V only - need open JP9
 //#define DEBUG              // enable some debugging
 //=====[ FREQUENCY RULES ]===========================================================================================
@@ -388,23 +393,23 @@ void setup()
     #endif
 
     while (!Serial && (millis() < 5000)) ; // wait for Arduino Serial Monitor
-    Serial.println("\n\nUSB Host Testing - Serial V0.2");
+    PC_Debug_port.println("\n\nUSB Host Testing - Serial V0.2");
     myusb.begin();
     delay(50);
-    Serial.println("Waiting for USB device to register on USB Host port");
+    PC_Debug_port.println("Waiting for USB device to register on USB Host port");
     while (!Proceed)  // observed about 500ms required.
     {
         refresh_myUSB();   // wait until we have a valid USB 
-        //Serial.print("Retry (500ms) = "); Serial.println(counter++);
+        //PC_Debug_port.print("Retry (500ms) = "); PC_Debug_port.println(counter++);
         delay (500);
     }
     delay(1);  // about 1-2 seconds needed before RS-HFIQ ready to receive commands over USB
-    Serial.println("Start of USB Host port Setup");
+    PC_Debug_port.println("Start of USB Host port Setup");
 
     counter = 0;
     //disp_Menu();
 
-    Serial.println("End of Setup");
+    PC_Debug_port.println("End of Setup");
     //FrequencyRequest();
     PC_CAT_port.flush();
     #ifdef GPS
@@ -433,17 +438,17 @@ void loop()
 void cmd_Console(void)
 {
     byte incomingByte = 0;
-    //byte incomingByte_1 = 0;
     byte outgoingByte = 0;
 
   #ifdef GPS
+    byte incomingByte_1 = 0;
     // read the 905 GPS data on the 2nd virtual serial USB Host interface and pass it through to the PC at 9600baud
     while (userial1.available() > 0) 
     {
       incomingByte_1 = userial1.read();   // GPS 
       PC_GPS_port.write(incomingByte_1);
-      //Serial.print("GPS: ");
-      //Serial.printf("%c",incomingByte_1);
+      //PC_Debug_port.print("GPS: ");
+      //PC_Debug_port.printf("%c",incomingByte_1);
     }
   #endif
 
@@ -454,17 +459,17 @@ void cmd_Console(void)
     userial.write(outgoingByte);
   }
 
-  // CI-V CAT port/  PAss though CI-V CAT data FROM radio to PC
+  // CI-V CAT port/  Pass through CI-V CAT data FROM radio to PC
   if (userial.available() > 0) 
   {
     incomingByte = userial.read();    // Read radio CI-V output
     PC_CAT_port.write(incomingByte);  // pass through to the PC
 
     //#if defined(DEBUG)
-      //Serial.print(incomingByte);
-      //Serial.print(F("|"));
-      //Serial.print(incomingByte, HEX);
-      //Serial.print(" ");
+      //PC_Debug_port.print(incomingByte);
+      //PC_Debug_port.print(F("|"));
+      //PC_Debug_port.print(incomingByte, HEX);
+      //PC_Debug_port.print(" ");
     //#endif
     
     icomSM(incomingByte);
@@ -482,13 +487,13 @@ void cmd_Console(void)
         }
         rdIS = rdIS + String(rdI[i], HEX);  // append BCD digit from HEX variable to string
       }
-      //Serial.print(rdIS);
+      //PC_Debug_port.print(rdIS);
       freq = strtoll(rdIS.c_str(), NULL, 10);
 
       #ifdef DISP_FREQ
-        Serial.print("-");
-        Serial.print(freq);
-        Serial.print("-");
+        PC_Debug_port.print("-");
+        PC_Debug_port.print(freq);
+        PC_Debug_port.print("-");
       #endif
       
       formatVFO(freq);
@@ -509,12 +514,12 @@ int icomSM(byte b)
     // This filter solves read from 0x00 0x05 0x03 commands and 00 E0 F1 address used by software
     static bool Band100GHz = false;
     /* 
-    Serial.print(b, HEX);
-    Serial.print("|");
-    Serial.print(state);
-    Serial.print("|");
-    Serial.print(Band100GHz);
-    Serial.print(" | ");
+    PC_Debug_port.print(b, HEX);
+    PC_Debug_port.print("|");
+    PC_Debug_port.print(state);
+    PC_Debug_port.print("|");
+    PC_Debug_port.print(Band100GHz);
+    PC_Debug_port.print(" | ");
     */
     switch (state) 
     {
@@ -615,7 +620,7 @@ int icomSM(byte b)
                 break;
         
         // For the IC-905, the FD will be after 5 bytes for frequencies < 6GHz, 6 bytes for 10GB
-        case 13: //Serial.print("Test 100GHz|"); 
+        case 13: //PC_Debug_port.print("Test 100GHz|"); 
                 if( b == 0x01 && Band100GHz==true)
                 {state = 14; rdI[10]=b;}   // 100GHz 10GHz  <-- 100GHz limit
                 else if( b == 0xFD )
@@ -625,7 +630,7 @@ int icomSM(byte b)
                 else{state = 1;}
                 break;
         
-        case 14: //Serial.println("Test FD"); 
+        case 14: //PC_Debug_port.println("Test FD"); 
                 if( b == 0xFD )
                 {state = 1; rdI[11]=b; StateMachineEnd = true;}   // end of freq report
                 else if( b == 0xFE )
@@ -660,7 +665,7 @@ int icomSM(byte b)
     }
 
     // will process all 6 bytes of frequency
-    //Serial.printf("%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X\n",rdI[0],rdI[1],rdI[2],rdI[3],rdI[4],rdI[5],rdI[6],rdI[7],rdI[8],rdI[9],rdI[10],rdI[11]);
+    //PC_Debug_port.printf("%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X\n",rdI[0],rdI[1],rdI[2],rdI[3],rdI[4],rdI[5],rdI[6],rdI[7],rdI[8],rdI[9],rdI[10],rdI[11]);
     return 0;
 }
 
@@ -773,7 +778,7 @@ int read_RSHFIQ(void)
 {
     while (userial.available()) 
     {
-        //Serial.println("USerial Available");
+        //PC_Debug_port.println("USerial Available");
         return userial.read();
     }
     return 0;
@@ -790,22 +795,22 @@ void refresh_myUSB(void)
         {
             if (driver_active[i]) 
             {
-                Serial.printf("*** Device %s - disconnected ***\n", driver_names[i]);
+                PC_Debug_port.printf("*** Device %s - disconnected ***\n", driver_names[i]);
                 driver_active[i] = false;
                 Proceed = false;
             } 
             else 
             {
-                Serial.printf("*** Device %s %x:%x - connected ***\n", driver_names[i], drivers[i]->idVendor(), drivers[i]->idProduct());
+                PC_Debug_port.printf("*** Device %s %x:%x - connected ***\n", driver_names[i], drivers[i]->idVendor(), drivers[i]->idProduct());
                 driver_active[i] = true;
                 Proceed = true;
 
                 const uint8_t *psz = drivers[i]->manufacturer();
-                if (psz && *psz) Serial.printf("  manufacturer: %s\n", psz);
+                if (psz && *psz) PC_Debug_port.printf("  manufacturer: %s\n", psz);
                 psz = drivers[i]->product();
-                if (psz && *psz) Serial.printf("  product: %s\n", psz);
+                if (psz && *psz) PC_Debug_port.printf("  product: %s\n", psz);
                 psz = drivers[i]->serialNumber();
-                if (psz && *psz) Serial.printf("  Serial: %s\n", psz);
+                if (psz && *psz) PC_Debug_port.printf("  Serial: %s\n", psz);
 
                 // If this is a new Serial device.
                 if (drivers[i] == &userial1) 
@@ -964,7 +969,7 @@ const char* formatVFO(uint64_t vfo)
 	sprintf(vfo_str, "%lu.%03u.%03u", MHz, KHz, Hz);
 	
   #ifdef DISP_FREQ
-    Serial.printf(" %sMHz\n", vfo_str);
+    PC_Debug_port.printf(" %sMHz\n", vfo_str);
   #endif
   
 	return vfo_str;
