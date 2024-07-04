@@ -35,3 +35,6 @@ If using digital modes on a PC and audio is desired, use the LAN connection.  It
 
 This is minimally tested on my bench and will require some code customization to output the IO pin pattern you need.  Feel free to open Issues on the GitHub repository.  I intend to package one up later on for my use.
 
+July 2024 Updates
+
+Pulled in my Teensy SDR code and stubbed out audio and spectrum and PLL related code. Runnig the code on one of my Teensy SDR chassis (7" for now) since it has all the hardware needed.  I copy the extracted CI-V bus radio frequency into VFOA on the SDR chassis for display.  The encoders and swicthes change things on the display thinking it is still an SDR, but they have no effect today. Next steps are to extract other radio settings of interest and pull in the Band decoder project code.  Key features I want first up ande band menu select, VFO A and B display and control with teh VFO knobs, display mode, filter, and then add ability to control the radio more fully. Buffered IO hardware will be added to control antennas, transverters and amps.
