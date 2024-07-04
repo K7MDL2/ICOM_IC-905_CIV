@@ -42,11 +42,13 @@ Pulled in my Teensy SDR code and stubbed out audio and spectrum and PLL related 
 In the case of at least the IC-905, can extract time from the USB ch 'B' NMEA data strings and update clock and Grid square on my display.  Currently time is form PC over USB when programmed or when ENET is enabled, NTP.  The GPS will work offline so is desireable to use.  Possible the grid square is already inteh CI-V but since they show it on the 905 info screens.
 
 Showing stripped down SDR screen with live VFOA from CI-V bus (USB ch'A')
+
 ![Showing stripped down SDR screen with live VFOA from CI-V bus (USB ch'A')](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/20240703_234200.jpg)
 
 Band Select screen configured for IC-905 supported bands. Can be configured for 160M through 122Ghz for other radios with or without transverters
+
 ![Band Select screen configured for IC-905 supported bands. Can be configured for 160M through 122Ghz for other radios with or without transverters](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/20240703_234354.jpg)
 
 GPS NMEA strings from USB ch 'B'
-![GPS NMEA strings from USB ch 'B'](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/905%20NMEA%20data.jpg)
 
+![GPS NMEA strings from USB ch 'B'](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/905%20NMEA%20data.jpg)
