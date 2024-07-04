@@ -4,6 +4,8 @@
 //
 //    USB Band Decoder for IC-905
 //    Original June 23, 2023 by K7MDL
+//    Updated July 2024 to display on a touchscreen radio frequency.
+//      Eventuallly control the radio over CIV and to extract GPS time and location data for display.
 // 
 //  Connect IC-905 to Teensy Host port.
 //  Connect PC to Teensy USB
