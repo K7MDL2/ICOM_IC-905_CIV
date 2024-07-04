@@ -40,3 +40,13 @@ July 2024 Updates
 Pulled in my Teensy SDR code and stubbed out audio and spectrum and PLL related code. Runnig the code on one of my Teensy SDR chassis (7" for now) since it has all the hardware needed.  I copy the extracted CI-V bus radio frequency into VFOA on the SDR chassis for display.  The encoders and swicthes change things on the display thinking it is still an SDR, but they have no effect today. Next steps are to extract other radio settings of interest and pull in the Band decoder project code.  Key features I want first up ande band menu select, VFO A and B display and control with teh VFO knobs, display mode, filter, and then add ability to control the radio more fully. Buffered IO hardware will be added to control antennas, transverters and amps.
 
 In the case of at least the IC-905, can extract time from the USB ch 'B' NMEA data strings and update clock and Grid square on my display.  Currently time is form PC over USB when programmed or when ENET is enabled, NTP.  The GPS will work offline so is desireable to use.  Possible the grid square is already inteh CI-V but since they show it on the 905 info screens.
+
+Showing stripped down SDR screen with live VFOA from CI-V bus (USB ch'A')
+https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/20240703_234200.jpg
+
+Band Select screen configured for IC-905 supported bands. Can be configured for 160M through 122Ghz for other radios with or without transverters
+https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/20240703_234354.jpg
+
+GPS NMEA strings from USB ch 'B' 
+https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/905%20NMEA%20data.jpg
+
