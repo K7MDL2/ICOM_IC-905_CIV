@@ -74,3 +74,4 @@ Hooking this box up is simple.  Plug a USB Type-A cable into the Teensy 4.X host
 
 In theory it can work without any screen or encoders and act just as a band decoder once that code is added.  A read-only Screen at minimum, could be an OLED, or character LCD even. I think the touch screen, switches, and encoders will offer good value for things like CW macros, quick bands changes, more accurate touch tuning, less menu hunting.  Things like external amp temp and power can be read and displayed, perhaps over hardware serial or i2C bus connections.
 
+I added a new folder containing my modified version of the CI-V library for the 905 and bands > 2GHz.  You can copy them to your normal Arduino libraries folder.  I expect they will need further udpates as I go, especially as I add higher level command support.
