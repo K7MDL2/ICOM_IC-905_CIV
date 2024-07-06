@@ -10,6 +10,7 @@
 //  Connect IC-905 to Teensy Host port.
 //  Connect PC to Teensy USB
 //  Connect Teensy IO pins to buffers and devices for band specific control
+//  3 USB Serial ports used.  1 = Debug, 2= CAT, 3 = GPS data
 //
 //  Includes modified code from RemoteTH.com - see below
 //
@@ -27,13 +28,16 @@
 
 #include <Arduino.h>                    // from Arduino
 #include <avr/pgmspace.h>               // from Arduino
-#include "USBHost_t36.h"
+//#include "USBHost_t36.h"
 #include <Metro.h>
 #include <SD.h>
 #include <SerialFlash.h>
 #include <SPI.h>                        // from Arduino
 #include <Wire.h>                       // from Arduino
 #include <TimeLib.h>                    // from Arduino
+#include <CIVcmds.h>                    // ICm CIV library https://github.com/WillyIoBrok/CIVmasterLib
+#include <CIVmaster.h> // CIVcmds.h is automatically included in addition
+#include <ICradio.h>    // this would include CIVcmds.h and CIVmaster.h, if not included before !
 
 // External libraries - These are not all of them as some appear with #ifdef blocks based on feature selection - See Github Wiki "Libraries" page for a full listing.
 #define  ENCODER_OPTIMIZE_INTERRUPTS    // leave this one here.  Not normally user changed
@@ -43,79 +47,13 @@
 
 #define BYPASS_SPECTRUM_MODULE   // debugging temp 
 
-#define DEBUG  //set for debug output
-
-#ifdef  DEBUG
-  #define DEBUG_ERROR true
-  #define DEBUG_ERROR_SERIAL if(DEBUG_ERROR)Serial
-
-  #define DEBUG_WARNING true
-  #define DEBUG_WARNING_SERIAL if(DEBUG_WARNING)Serial
-
-  #define DEBUG_INFORMATION true
-  #define DEBUG_INFORMATION_SERIAL if(DEBUG_INFORMATION)Serial
-  #define DSERIALBEGIN(...)   Serial.begin(__VA_ARGS__)
-  #define DPRINTLN(...)       Serial.println(__VA_ARGS__)
-  #define DPRINT(...)         Serial.print(__VA_ARGS__)
-  #define DPRINTF(...)        Serial.print(F(__VA_ARGS__))
-  #define DPRINTLNF(...)      Serial.println(F(__VA_ARGS__)) //printing text using the F macro
-  #define DELAY(...)          delay(__VA_ARGS__)
-  #define PINMODE(...)        pinMode(__VA_ARGS__)
-  #define TOGGLEd13           PINB = 0x20                    //UNO's pin D13
-  #define DEBUG_PRINT(...)    Serial.print(F(#__VA_ARGS__" = ")); Serial.print(__VA_ARGS__); Serial.print(F(" ")) 
-  #define DEBUG_PRINTLN(...)  DEBUG_PRINT(__VA_ARGS__); Serial.println()
-  #define DEBUG_PRINTF(...)   Serial.printf(__VA_ARGS__)
-#else
-  #define DSERIALBEGIN(...)
-  #define DPRINTLN(...)
-  #define DPRINT(...)
-  #define DPRINTF(...)      
-  #define DPRINTLNF(...)    
-  #define DELAY(...)        
-  #define PINMODE(...)      
-  #define TOGGLEd13      
-  #define DEBUG_PRINT(...)    
-  #define DEBUG_PRINTLN(...)
-  #define DEBUG_PRINTF(...)
-#endif
-
 // Below are local project files
 #include "RadioConfig.h"        // Our main configuration file
 #include "ICOM_IC-905_CIV.h"
 #include "SDR_Data.h"
 #include "SDR_I2C_Encoder.h"    // See RadioConfig.h for more config including assigning an INT pin.                                          
-                                // Hardware verson 2.1, Arduino library version 1.40.                                 
+                                // Hardware verson 2.1, Arduino library version 1.40.      
 
-#define USBBAUD 115200   // RS-HFIQ uses 57600 baud
-uint32_t baud = USBBAUD;
-uint32_t format = USBHOST_SERIAL_8N1;
-USBHost myusb;
-USBHub hub1(myusb);
-USBHub hub2(myusb);
-USBHIDParser hid1(myusb);
-USBHIDParser hid2(myusb);
-//USBHIDParser hid3(myusb);
-
-// There are now two versions of the USBSerial class, that are both derived from a common Base class
-// The difference is on how large of transfers that it can handle.  This is controlled by
-// the device descriptor, where up to now we handled those up to 64 byte USB transfers.
-// But there are now new devices that support larger transfer like 512 bytes.  This for example
-// includes the Teensy 4.x boards.  For these we need the big buffer version. 
-// uncomment one of the following defines for userial
-//USBSerial userial(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
-//USBSerial userial1(myusb);  // works only for those Serial devices who transfer <=64 bytes (like T3.x, FTDI...)
-USBSerial_BigBuffer userial(myusb, 1); // Handles anything up to 512 bytes
-USBSerial_BigBuffer userial1(myusb, 1); // Handles anything up to 512 bytes
-//USBSerial_BigBuffer userial(myusb); // Handles up to 512 but by default only for those > 64 bytes
-//USBSerial_BigBuffer userial1(myusb); // Handles up to 512 but by default only for those > 64 bytes
-
-USBDriver *drivers[] = {&hub1, &hub2, &hid1, &hid2, &userial, &userial1};
-#define CNT_DEVICES (sizeof(drivers)/sizeof(drivers[0]))
-const char * driver_names[CNT_DEVICES] = {"Hub1", "Hub2",  "HID1", "HID2", "USERIAL1", "USERIAL2" };
-bool driver_active[CNT_DEVICES] = {false, false, false, false};
-
-Metro CAT_Poll = Metro(1000);     // Throttle the servicing for CAT comms
-bool Proceed  = false; 
 int   counter = 0;
 
 #ifdef I2C_ENCODERS // This turns on support for DuPPa.net I2C encoder with RGB LED integrated. 
@@ -240,6 +178,8 @@ Metro gpio_ENC2_Read_timer = Metro(700);    // time allowed to accumulate counts
 Metro gpio_ENC3_Read_timer = Metro(700);    // time allowed to accumulate counts for slow moving detented encoders
 Metro TX_Timeout           = Metro(180000); // 180000 is 3 minutes for RunawayTX timeout
 Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT comms
+Metro CAT_Poll             = Metro(1000);  // Throttle the servicing for CAT comms
+Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 uint64_t    xvtr_offset             = 0;
 int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
 int16_t     xit_offset              = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
@@ -251,13 +191,6 @@ int16_t     fft_size            = FFT_SIZE;       // This value will be passed t
 int16_t     fft_bins            = (int16_t) fft_size;       // Number of FFT bins which is FFT_SIZE/2 for real version or FFT_SIZE for iq version
 float       sample_rate_Hz      = 44100.0f;  //43Hz /bin  12.5K spectrum
 float       fft_bin_size        = sample_rate_Hz/(fft_size*2);   // Size of FFT bin in HZ.  From sample_rate_Hz/FFT_SIZE for iq
-
-#define DISP_FREQ
-#define GPS
-#define PC_CAT_port Serial
-//#define PC_CAT_port SerialUSB1
-#define PC_GPS_port SerialUSB1
-#define PC_Debug_port SerialUSB2
 
 //
 //----------------------------------------------------------------------------------------------------------------------------
@@ -276,15 +209,6 @@ uint8_t     display_state;   // something to hold the button state for the displ
 bool        touchBeep_flag          = false;
 uint8_t     popup       = 0;   // experimental flag for pop up windows
 
-int fromAdress = 0xE0;              // 0E
-byte rdI[12];   //read data icom
-String rdIS;    //read data icom string
-uint64_t freqPrev1;
-byte incomingByte = 0;
-int state = 1;  // state machine
-bool StateMachineEnd = false;
-int icomSM(byte b);
-int txCIV(int commandCIV, uint32_t dataCIVtx, int toAddress);
 int BAND = 0;
 int previousBAND = -1;
 uint64_t freq = 0;
@@ -296,6 +220,35 @@ float DCinVoltage;
 #else
   float ResistorCoeficient = 6.0;
 #endif
+
+//-------------------------------------------------------------------------------
+// create the civ object
+
+    CIV     civ;  // create the CIV-Interface object
+    ICradio ICxxxx(TypeIC905,CIV_ADDR_905);
+//-------------------------------------------------------------------------------
+
+uint8_t lpCnt = 0;
+CIVresult_t CIVresultL;
+
+const String retValStr[7] = {
+  "CIV_OK",
+  "CIV_OK_DAV",
+  "CIV_NOK",
+  "CIV_HW_FAULT",
+  "CIV_BUS_BUSY",
+  "CIV_BUS_CONFLICT",
+  "CIV_NO_MSG"
+};
+
+radioOnOff_t  	radioS      = RADIO_NDEF;
+radioOnOff_t  	localS      = RADIO_NDEF;
+uint64_t 	    radioF      = 0;
+uint64_t 	    localF      = 0;
+uint8_t       	radioM      = MOD_NDEF;
+uint8_t       	localM      = MOD_NDEF;
+uint8_t       	radioFil    = FIL_NDEF;
+uint8_t       	localFil    = FIL_NDEF;
 
 uint32_t VoltageRefresh[2] = {0, 3000};   // refresh in ms
 float ArefVoltage = 4.303;            // Measure on Aref pin 20 for calibrate
@@ -560,6 +513,11 @@ int timeout2;
 
 tmElements_t tm;
 time_t prevDisplay = 0; // When the digital clock was displayed
+/* timer  variables */
+unsigned long time_current_baseloop;       // temporary time of the baseloop entry for calculations
+unsigned long time_last_baseloop;          // will be updated at the end of every baseloop run
+#define BASELOOP_TICK 10 
+
 
 void setup()
 {
@@ -572,11 +530,17 @@ void setup()
     DPRINTLN(fft_size);
     DPRINTLNF("**** Running I2C Scanner ****");
 
+    civ.setupp(true, false, "");      // initialize the civ object/module
+                                      // and the ICradio objects
+
+    civ.registerAddr(CIV_ADDR_905);    // tell civ, that this is a valid address to be used
+
+
     // ---------------- Setup our basic display and comms ---------------------------
     Wire.begin();
     Wire.setClock(100000UL); // Keep at 100K I2C bus transfer data rate for I2C Encoders to work right
     I2C_Scanner();
-#ifdef  I2C_ENCODERS  
+    #ifdef  I2C_ENCODERS  
         set_I2CEncoders();   // Serasch through encoder_list table and identify active i2c encoder roles and slot assignments.
     #endif // I2C_ENCODERS
 
@@ -702,36 +666,15 @@ void setup()
         lcd.print("MyCall SDR"); // Edit this to what you like to see on your display
     #endif
 
-    //  Set up USB Host port - these 2 are serial ports.
-    //int blocking = 1;
-    PC_CAT_port.begin(115200);
-    #ifdef GPS
-      PC_GPS_port.begin(9600);
-    #endif
-
     while (!Serial && (millis() < 5000)) ; // wait for Arduino Serial Monitor
     PC_Debug_port.println("\n\nUSB Host Testing - Serial V0.2");
-    myusb.begin();
-    delay(50);
-    PC_Debug_port.println("Waiting for USB device to register on USB Host port");
-    while (!Proceed)  // observed about 500ms required.
-    {
-        refresh_myUSB();   // wait until we have a valid USB 
-        //PC_Debug_port.print("Retry (500ms) = "); PC_Debug_port.println(counter++);
-        delay (500);
-    }
-    delay(1);  // about 1-2 seconds needed before RS-HFIQ ready to receive commands over USB
-    PC_Debug_port.println("Start of USB Host port Setup");
-
+    
     counter = 0;
     //disp_Menu();
 
     PC_Debug_port.println("End of Setup");
+
     //FrequencyRequest();
-    PC_CAT_port.flush();
-    #ifdef GPS
-      PC_GPS_port.flush();
-    #endif
 
      // -------- Read SD Card data----------------------------------------------------------
     // To use the audio card SD card Reader instead of the Teensy 4.1 onboard Card Reader
@@ -740,13 +683,13 @@ void setup()
     //SPI.setSCK(14);  // Audio shield has SCK on pin 14
 
     // see if the card is present and can be initialized:
-    SD_CardInfo();
+    //SD_CardInfo();
     // open or create our config file.  Filenames follow DOS 8.3 format rules
-    Open_SD_cfgfile();
+    //Open_SD_cfgfile();
     // test our file
     // make a string for assembling the data to log:
     //write_db_tables();
-    read_db_tables();              // Read in stored values to memory
+    //read_db_tables();              // Read in stored values to memory
     //write_radiocfg_h();         // write out the #define to a file on the SD card.
                                     // This could be used by the PC during compile to override the RadioConfig.h
 
@@ -810,6 +753,9 @@ void setup()
 
 // ********************************************Loop ******************************************
 static uint32_t delta = 0;
+bool    freqReceived = false; // initially, no frequency info has been received from the radio
+bool    modeReceived = false;
+uint8_t freqPoll     = 0;     // number of initial frequency querys in addtion to the broadcast info
 
 void loop()
 {  
@@ -820,7 +766,7 @@ void loop()
         static uint32_t time_sp;
     #endif
 
-    #ifdef DEBUG
+    #ifdef DEBUG_LOOP
         // JH
         static uint16_t loopcount = 0;
         static uint32_t jhTime    = millis();
@@ -838,9 +784,67 @@ void loop()
         }
     #endif
 
-  cmd_Console();
+    time_current_baseloop = millis();
+    //if ((time_current_baseloop - time_last_baseloop) > BASELOOP_TICK) {
+        // ----------------------------------  check, whether there is something new from the radio
+        //if (time_current_baseloop>t_RadioCheck) 
+        
+        CIVresultL = civ.readMsg(CIV_ADDR_905);
+        if (CIVresultL.retVal<=CIV_NOK) {               // valid answer received !           
+            #ifdef debug
+              //Serial.print('.');
+            #endif
+            if (CIVresultL.retVal==CIV_OK_DAV) {          // Data available
+                // Frequency
+                if ((CIVresultL.cmd[1]==CIV_C_F_SEND[1]) ||  // command CIV_C_F_SEND received
+                    (CIVresultL.cmd[1]==CIV_C_F_READ[1])) {  // command CIV_C_F_READ received
+                    freqReceived = true;
+                    PC_Debug_port.print(" Frequency: "); PC_Debug_port.println(CIVresultL.value);
+                    freq = (uint64_t) CIVresultL.value;
+                    VFOA = freq;
+                    formatVFO(VFOA);
+                    FreqToBandRules();
+                    //bandSET();
+                    displayFreq();                        
+                } // command CIV_C_F_SEND or CIV_C_F_READ received  
+                else
+                // Mode
+                if ((CIVresultL.cmd[1]==CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
+                    (CIVresultL.cmd[1]==CIV_C_MOD_READ[1])) {  // command CIV_C_MODE_READ received
+                    modeReceived = true;
+                    PC_Debug_port.print("Mode Changed: ");
+                    PC_Debug_port.println((uint8_t) CIVresultL.value);
+                    selectMode((uint8_t) CIVresultL.value); // Select the mode for the Active VFO
+                }
+            } // Data available
+        } // valid answer received           
+
+        // ----------------------------------  do a query for frequency, if necessary
+        // poll every 500 * 10ms = 5sec until a valid frequency has been received
+        if ( (freqReceived == false) && ((lpCnt%500)==0) ) { 
+            civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
+            freqPoll++;
+            Serial.println("P ");
+        }
+        
+        lpCnt++;
+        time_last_baseloop = time_current_baseloop;
+	//} // if BASELOOP_TICK
+
+    #ifdef GPS
+        civ.readGPS();   // read USB serial ch 'B' for GPS NMEA data strings
+        // ToDo: extract grid and time info and display
+    #endif
+
+    //civ.pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
+    civ.pass_CAT_msg_to_RADIO();
   
-  //if (CAT_Poll.check() == 1) 
+    //if (CAT_Poll.check() == 1) 
+        //civ.logDisplay();  // show messages accumulated until cleared.
+
+    //if (CAT_Log_Clear.check() == 1)      // Clear the CIV log buffer, jsu show last 2 seconds
+        //civ.logClear();
+  
     //FrequencyRequest();   // Normally the frequency will be polled by external computer but if a local display is used, then poll it here
     #ifdef DEBUG
         time_sp = millis();
@@ -955,287 +959,59 @@ void loop()
             displayTime();
         }
     }
-
 }
 
-void cmd_Console(void)
+void SendCIVmsg(void)
 {
-    byte incomingByte = 0;
-    byte outgoingByte = 0;
-
-  #ifdef GPS
-    byte incomingByte_1 = 0;
-    // read the 905 GPS data on the 2nd virtual serial USB Host interface and pass it through to the PC at 9600baud
-    while (userial1.available() > 0) 
-    {
-      incomingByte_1 = userial1.read();   // GPS 
-      PC_GPS_port.write(incomingByte_1);
-      //PC_Debug_port.print("GPS: ");
-      //PC_Debug_port.printf("%c",incomingByte_1);
-    }
-  #endif
-
-  // Pass though CI-V data FROM PC to RADIO
-  if (PC_CAT_port.available() > 0) 
-  {
-    outgoingByte = PC_CAT_port.read();
-    userial.write(outgoingByte);
-  }
-
-  // CI-V CAT port/  Pass through CI-V CAT data FROM radio to PC
-  if (userial.available() > 0) 
-  {
-    incomingByte = userial.read();    // Read radio CI-V output
-    PC_CAT_port.write(incomingByte);  // pass through to the PC
-
-    //#if defined(DEBUG)
-      //PC_Debug_port.print(incomingByte);
-      //PC_Debug_port.print(F("|"));
-      //PC_Debug_port.print(incomingByte, HEX);
-      //PC_Debug_port.print(" ");
-    //#endif
+    uint8_t str[20] = "\xFE\xFE\xE0\x05\x00\x00\x20\x44\x01\xFD\x00";
+    if (CAT_Poll.check() == 1) {
+    CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_SEND, str, CIV_wChk);
+    //CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
+    PC_Debug_port.print("retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL.retVal]);
     
-    icomSM(incomingByte);
-    
-    rdIS="";
-    // if(rdI[10]==0xFD){    // state machine end// state machine end
-    if(StateMachineEnd == true)  // state machine end
-    {
-      StateMachineEnd = false;
-      for (int i=10; i>=5; i-- )  //format frequency  - byte 11 is FD EOM  byte 5 is 1 and 10Hz.
-      {
-        if (rdI[i] < 10)            // leading zero
-        { 
-          rdIS = rdIS + 0;
-        }
-        rdIS = rdIS + String(rdI[i], HEX);  // append BCD digit from HEX variable to string
-      }
-      //PC_Debug_port.print(rdIS);
-      freq = strtoll(rdIS.c_str(), NULL, 10);
-
-      #ifdef DISP_FREQ
-        PC_Debug_port.print(" ");
-        PC_Debug_port.print(freq);
-        PC_Debug_port.println(" ");
-      #endif
-      
-      VFOA = freq;
-      formatVFO(VFOA);
-      FreqToBandRules();
-      //bandSET();
-      displayFreq();
-
-      #if defined(SERIAL_echo)
-          serialEcho();
-      #endif
-      RequestTimeout[0]=millis();
     }
-  }
+    //give the radio some time to answer version 1:
+    //delay(20);
+    //CIVresultL = civ.readMsg(CIV_ADDR_905);
+    //PC_Debug_port.print("retVal: ");      Serial.print(CIVresultL.retVal);
+    //PC_Debug_port.print(" Frequency: "); Serial.println(CIVresultL.value);
 }
- 
-int icomSM(byte b)
-{      
-   // state machine
-    // This filter solves read from 0x00 0x05 0x03 commands and 00 E0 F1 address used by software
-    static bool Band100GHz = false;
-    /* 
-    PC_Debug_port.print(b, HEX);
-    PC_Debug_port.print("|");
-    PC_Debug_port.print(state);
-    PC_Debug_port.print("|");
-    PC_Debug_port.print(Band100GHz);
-    PC_Debug_port.print(" | ");
-    */
-    switch (state) 
-    {
-        case 1: if( b == 0xFE ) 
-                { state = 2; rdI[0]=b; }  
-                for (int j=1; j<12; j++)
-                  rdI[j]=0x00;
-                break;
 
-        case 2: if( b == 0xFE ) 
-                { state = 3; rdI[1]=b;} 
-                else
-                { state = 1;}; 
-                break;
-
-        // addresses that use different software 00-trx, e0-pc-ale, winlinkRMS, f1-winlink trimode
-        case 3: if( b == 0x00 || b == 0xE0 || b == 0x0E || b == 0xF1 ){ state = 4; rdI[2]=b;}                       // choose command $03
-                else if( b == CIV_ADRESS )
-                { state = 6; rdI[2]=b;}
-                else if( b == 0xFE )
-                { state = 3; rdI[1]=b;}      // FE (3x reduce to 2x)
-                else 
-                { state = 1;}
-                break;                       // or $05
-
-        case 4: if( b == CIV_ADRESS )
-                { state = 5; rdI[3]=b;}
-                else
-                { state = 1;}
-                break;                      // select command $03
-
-        case 5: if( b == 0x00 || b == 0x03 )
-                {state = 8; rdI[4]=b;}  // freq
-                else if( b == 0x04 )
-                {state = 15; rdI[4]=b;}        // mode
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}        // FE
-                else
-                { state = 1;}
-                break;
-
-        case 6: if( b == 0x00 || b == 0xE0 || b == 0xF1 )
-                { state = 7; rdI[3]=b;} 
-                else
-                { state = 1;}
-                break;  // select command $05
-
-        case 7: if( b == 0x00 || b == 0x05 )
-                { state = 8; rdI[4]=b;}
-                else
-                { state = 1;}
-                break;
-
-        case 8: if( b <= 0x99 )
-                {state = 9; rdI[5]=b;}             // 10Hz 1Hz
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;} 
-                break;
-
-        case 9: if( b <= 0x99 )
-                {state = 10; rdI[6]=b;}            // 1kHz 100Hz
-                else if( b == 0xFE ) 
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;}
-                break;
-        
-        case 10: if( b <= 0x99 )
-                {state = 11; rdI[7]=b;}            // 100kHz 10kHz
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;}
-                break;
-        
-        case 11: if( b <= 0x99)
-                { 
-                  state = 12; rdI[8]=b;            // 10MHz 1Mhz
-                  Band100GHz=false;
-                }
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                { state = 1;} 
-                break;
-        
-        case 12: if( b <= 0x99)
-                {
-                  state = 13; rdI[9]=b;            // 1GHz 100MHz
-                  Band100GHz=true;
-                }
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;}
-                break;
-        
-        // For the IC-905, the FD will be after 5 bytes for frequencies < 6GHz, 6 bytes for 10GB
-        case 13: //PC_Debug_port.print("Test 100GHz|"); 
-                if( b == 0x01 && Band100GHz==true)
-                {state = 14; rdI[10]=b;}   // 100GHz 10GHz  <-- 100GHz limit
-                else if( b == 0xFD )
-                {state = 1; rdI[11]=b; StateMachineEnd = true;}  // end of freq report
-                else if( b == 0xFE )
-                {state = 2; rdI[0]=b;}      // FE
-                else{state = 1;}
-                break;
-        
-        case 14: //PC_Debug_port.println("Test FD"); 
-                if( b == 0xFD )
-                {state = 1; rdI[11]=b; StateMachineEnd = true;}   // end of freq report
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1; rdI[10] = 0x00;}
-                break;
-
-        case 15: if( b <= 0x12 )
-                {state = 16; rdI[5]=b;}
-                else if( b == 0xFE )
-                { state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;}
-                break;   // Mode
-        
-        case 16: if( b <= 0x03 )
-                {state = 17; rdI[6]=b;}
-                else if( b == 0xFE )
-                {state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1;}
-                break;   // Filter
-        
-        case 17: if( b == 0xFD )
-                {state = 1; rdI[7]=b;}
-                else if( b == 0xFE )
-                {state = 2; rdI[0]=b;}      // FE
-                else
-                {state = 1; rdI[7] = 0;}
-                break;
+void RcvCIVmsg(void)
+{
+    // give the radio some time to answer - version 2:  
+    // do a cyclic polling until data is available
+    //if (CAT_Poll.check() == 1) {
+    CIVresultL = civ.readMsg(CIV_ADDR_905);
+    if (CIVresultL.retVal<=CIV_NOK) {  // valid answer received !
+        //PC_Debug_port.print("retVal: ");      PC_Debug_port.print(retValStr[CIVresultL.retVal]);
+        if (CIVresultL.retVal==CIV_OK_DAV) // Data available
+        {
+            PC_Debug_port.print(" Frequency: "); PC_Debug_port.println(CIVresultL.value);
+            freq = (uint64_t) CIVresultL.value;
+            VFOA = freq;
+            formatVFO(VFOA);
+            FreqToBandRules();
+            //bandSET();
+            displayFreq();
+        }
     }
 
-    // will process all 6 bytes of frequency
-    //PC_Debug_port.printf("%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X|%02X\n",rdI[0],rdI[1],rdI[2],rdI[3],rdI[4],rdI[5],rdI[6],rdI[7],rdI[8],rdI[9],rdI[10],rdI[11]);
-    return 0;
+    // use "l",if "#define log_CIV" in file civ.h is active
+    //if (keyCmd==KEY_LOG_PRESSED) civ.logDisplay();
 }
 
 void FrequencyRequest(){
   #if defined(REQUEST)
   if(REQUEST > 0 && (millis() - RequestTimeout[0] > RequestTimeout[1])){
-
-    #if defined(ICOM_CIV)
-      txCIV(3, 0, CIV_ADRESS);  // ([command], [freq]) 3=read
-    #endif
-
+    //CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
+    PC_Debug_port.print("retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL.retVal]);
     RequestTimeout[0]=millis();
   }
   #endif
 }
 
-int txCIV(int commandCIV, uint32_t dataCIVtx, int toAddress) 
-{
-        //CAT_port.flush();
-        userial.write(254);                                    // FE
-        userial.write(254);                                    // FE
-        userial.write(toAddress);                              // to adress
-        userial.write(fromAdress);                             // from OE
-        userial.write(commandCIV);                             // data
-        if (dataCIVtx != 0){
-            String freqCIVtx = String(dataCIVtx);             // to string
-            freqCIVtx.reserve(11);
-            String freqCIVtxPart;
-            freqCIVtxPart.reserve(11);
-            while (freqCIVtx.length() < 10) {                 // leding zeros
-                freqCIVtx = 0 + freqCIVtx;
-            }
-            for (int x=8; x>=0; x=x-2){                       // loop for 5x2 char [xx xx xx xx xx]
-                freqCIVtxPart = freqCIVtx.substring(x,x+2);   // cut freq to five part
-                    userial.write(hexToDec(freqCIVtxPart));    // HEX to DEC, because write as DEC format from HEX variable
-            }
-        }
-        userial.write(253);                                    // FD
-        // CAT_port.flush();
-        while(userial.available()){        // clear buffer
-          userial.read();
-        }
-        return 0;
-  }
-  //---------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------
 
 unsigned int hexToDec(String hexString) {
     hexString.reserve(2);
@@ -1293,65 +1069,7 @@ char * convert_freq_to_Str(uint32_t freq)
   //send_fixed_cmd_to_RSHFIQ(freq_str);
   //return freq_str;
 }
-
-void write_RSHFIQ(int ch)
-{   
-    userial.write(ch);
-} 
-
-int read_RSHFIQ(void)
-{
-    while (userial.available()) 
-    {
-        //PC_Debug_port.println("USerial Available");
-        return userial.read();
-    }
-    return 0;
-}
 */
-
-void refresh_myUSB(void)
-{
-    myusb.Task();
-    // Print out information about different devices.
-    for (uint8_t i = 0; i < CNT_DEVICES; i++) 
-    {
-        if (*drivers[i] != driver_active[i]) 
-        {
-            if (driver_active[i]) 
-            {
-                PC_Debug_port.printf("*** Device %s - disconnected ***\n", driver_names[i]);
-                driver_active[i] = false;
-                Proceed = false;
-            } 
-            else 
-            {
-                PC_Debug_port.printf("*** Device %s %x:%x - connected ***\n", driver_names[i], drivers[i]->idVendor(), drivers[i]->idProduct());
-                driver_active[i] = true;
-                Proceed = true;
-
-                const uint8_t *psz = drivers[i]->manufacturer();
-                if (psz && *psz) PC_Debug_port.printf("  manufacturer: %s\n", psz);
-                psz = drivers[i]->product();
-                if (psz && *psz) PC_Debug_port.printf("  product: %s\n", psz);
-                psz = drivers[i]->serialNumber();
-                if (psz && *psz) PC_Debug_port.printf("  Serial: %s\n", psz);
-
-                // If this is a new Serial device.
-                if (drivers[i] == &userial1) 
-                {
-                    // Lets try first outputting something to our USerial to see if it will go out...
-                    userial.begin(baud);
-                }
-                if (drivers[i] == &userial1) 
-                {
-                    // Lets try first outputting something to our USerial to see if it will go out...
-                    userial1.begin(9600);
-                }
-            }
-        }
-    }
-}
 
 #ifdef BANDSET
 void bandSET() {                                               // set outputs by BAND variable
@@ -1528,6 +1246,7 @@ void updateActiveWindow(bool full)
 	}
 }
 #endif
+
 //
 //  Scans for any I2C connected devices and reports them to the serial terminal.  Usually done early in startup.
 //
@@ -2161,4 +1880,34 @@ COLD void set_MF_Service(uint8_t new_client_name) // this will be the new owner 
     MF_Timeout.reset();          // reset (extend) timeout timer as long as there is activity.
                                  // When it expires it will be switched to default
     // DPRINTF("New MF Knob Client ID is "); DPRINTLN(MF_client);
+}
+
+//---------------------------------------------------------------------------------------------
+// get the radio data and print them via the USB COM-port into the serial monitor
+
+void	getradioInfo() {
+
+    radioS = ICxxxx.getAvailability();
+    if (radioS != localS) {               // if there is a change in ON/OFF state -> print it out!
+      PC_Debug_port.print ("radioState: "); PC_Debug_port.println (radioOnOffStr[radioS]);
+      localS = radioS;
+    }
+
+    if (radioS==RADIO_ON) {               // only in case, the radio is switched on 
+                                          // and the connection is up and running
+
+      radioF = ICxxxx.getFrequency();
+      if (localF != radioF) {             // if there is a frequency change -> print it out!
+        PC_Debug_port.print    ("Freq[Hz]: "); PC_Debug_port.println  (radioF);
+        localF = radioF;
+      }
+
+      radioM    = ICxxxx.getModMode();
+      radioFil  = ICxxxx.getRxFilter();
+      if ((localM != radioM) || (localFil != radioFil)) { // if there is a change -> print it out!
+        PC_Debug_port.print ("Mod:  "); PC_Debug_port.print   (modModeStr[radioM]);
+        PC_Debug_port.print (" Fil: "); PC_Debug_port.println (FilStr[radioFil]);
+        localM = radioM; localFil = radioFil;
+      }
+	}
 }

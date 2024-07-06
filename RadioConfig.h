@@ -267,6 +267,9 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
     //#define CESSB_2xIQMIXER
     //#define CESSB_IQMIXER
     //#define IQ_CORRECTION_WITH_CESSB  // turns on IQ correction to possibly help improve sideband image rejection due to hardware imbalances.
+    
+    // IC-905 CIV stuff
+    #define GPS     // TPass through USB Serial ch 'B' data   
 
 #endif  // K7MDL_BUILD
 

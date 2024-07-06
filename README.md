@@ -52,3 +52,25 @@ Band Select screen configured for IC-905 supported bands. Can be configured for 
 GPS NMEA strings from USB ch 'B'
 
 ![GPS NMEA strings from USB ch 'B'](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/905%20NMEA%20data.jpg)
+
+
+July 5, 2024
+
+Significant rework done though still quite messy from pulling ion differnt project's code.  Lots to weed out and clean up.
+
+You can now use touch or an encoder to control VFOA and change bands. So VFOA is now 2 way.  Change the radio dial and this box's VFOA will stay synced.  Mode and Filters are received but not yet dealt with fully.
+
+This code update replaces the previous CI-V library with CIVMasterLib library found at https://github.com/WillyIoBrok/CIVmasterLib. It was not that bad to swap out but getting the send VFO frequency code to work was a challenge.  It wants const uint8_t values inteh writemsg fucntion and bytes in reverse order with a length byte at the front. Changes had to be made to the library and my frequency formatting code to account for the 905 using a 6 byte frequency message on bands 10GHz and higher, 5 bytes on lower bands.  Also replaced several unsigned longs with uint64_t to handle frequencies above 2.4Ghz.  Some of the higher level library fucntion I tried were causing slow perf so for now I am sticking with building my own as I need them.  The basics stuff seems to work fast enough. 
+
+Code is in place to pass theough both directoin CI-V data so you can run WSJT-X.  If you you use the encoder to change frequency it causes WSJT-X to panic and offer a retry. Teh long term answer is probably to have thisbox be a separate CI_V address but more study required.  The library does have code to handle multile radios on the bus.
+
+In SDR_Data.h I edited the Bandmem table defaults to turn off transverter support on IC-905 native bands.  I had to disable the SD Card coinfg as it was overriding the changes. Need to sort that out.
+
+Other than the removed spectrum and audio related functions, the screen is not updated but should work well as-is until time for a new layout.  The database allows for multiple layouts so just takes time to figure new xy cordinates and sizes.
+
+Still have to cut in band decoder logic and UI though I may do a simpler version instead.
+
+Hooking this box up is simple.  Plug a USB Type-A cable into the Teensy 4.X host board. The other Type-C end goes into the IC-905. The IC-705, IC-9700, and maybe other radios should work by changing the CI-V addresses in the code.  Will extract that to a config file later.  Optionally you can have a PC connected to the main Teensy USB port (micro connector), used for programming and debug but there are 3 USB serial ports active.  The 2nd is for CAT to programs like WSJT-X.  The 3rd is the IC-905 GPS NMEA data streaming.  I use NMEATime2 to use this data to compute grid square and keep the PC time sync'd.
+
+In theory it can work without any screen or encoders and act just as a band decoder once that code is added.  A read-only Screen at minimum, could be an OLED, or character LCD even. I think the touch screen, switches, and encoders will offer good value for things like CW macros, quick bands changes, more accurate touch tuning, less menu hunting.  Things like external amp temp and power can be read and displayed, perhaps over hardware serial or i2C bus connections.
+

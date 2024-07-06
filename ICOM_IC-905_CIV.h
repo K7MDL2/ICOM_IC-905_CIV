@@ -26,28 +26,35 @@
 
 #define BYPASS_SPECTRUM_MODULE   // debugging temp 
 
+#define DISP_FREQ
+#define GPS
+#define PC_CAT_port SerialUSB1
+//#define PC_CAT_port SerialUSB1
+#define PC_GPS_port SerialUSB2
+#define PC_Debug_port Serial
+
 #define DEBUG  //set for debug output
 
 #ifdef  DEBUG
 #define DEBUG_ERROR true
-#define DEBUG_ERROR_SERIAL if(DEBUG_ERROR)Serial
+#define DEBUG_ERROR_SERIAL if(DEBUG_ERROR)PC_Debug_port
 
 #define DEBUG_WARNING true
-#define DEBUG_WARNING_SERIAL if(DEBUG_WARNING)Serial
+#define DEBUG_WARNING_SERIAL if(DEBUG_WARNING)PC_Debug_port
 
 #define DEBUG_INFORMATION true
-#define DEBUG_INFORMATION_SERIAL if(DEBUG_INFORMATION)Serial
-#define DSERIALBEGIN(...)   Serial.begin(__VA_ARGS__)
-#define DPRINTLN(...)       Serial.println(__VA_ARGS__)
-#define DPRINT(...)         Serial.print(__VA_ARGS__)
-#define DPRINTF(...)        Serial.print(F(__VA_ARGS__))
-#define DPRINTLNF(...)      Serial.println(F(__VA_ARGS__)) //printing text using the F macro
+#define DEBUG_INFORMATION_SERIAL if(DEBUG_INFORMATION)PC_Debug_port
+#define DSERIALBEGIN(...)   PC_Debug_port.begin(__VA_ARGS__)
+#define DPRINTLN(...)       PC_Debug_port.println(__VA_ARGS__)
+#define DPRINT(...)         PC_Debug_port.print(__VA_ARGS__)
+#define DPRINTF(...)        PC_Debug_port.print(F(__VA_ARGS__))
+#define DPRINTLNF(...)      PC_Debug_port.println(F(__VA_ARGS__)) //printing text using the F macro
 #define DELAY(...)          delay(__VA_ARGS__)
 #define PINMODE(...)        pinMode(__VA_ARGS__)
 #define TOGGLEd13           PINB = 0x20                    //UNO's pin D13
-#define DEBUG_PRINT(...)    Serial.print(F(#__VA_ARGS__" = ")); Serial.print(__VA_ARGS__); Serial.print(F(" ")) 
+#define DEBUG_PRINT(...)    PC_Debug_port.print(F(#__VA_ARGS__" = ")); PC_Debug_port.print(__VA_ARGS__); PC_Debug_port.print(F(" ")) 
 #define DEBUG_PRINTLN(...)  DEBUG_PRINT(__VA_ARGS__); Serial.println()
-#define DEBUG_PRINTF(...)   Serial.printf(__VA_ARGS__)
+#define DEBUG_PRINTF(...)   PC_Debug_port.printf(__VA_ARGS__)
 #else
 #define DSERIALBEGIN(...)
 #define DPRINTLN(...)
@@ -79,11 +86,15 @@
 #include "UserInput.h"          // include after Spectrum_RA8875.h and Display.h
 //#include "Bandwidth2.h"
 #include "SD_Card.h"
+
 #if defined USE_RS_HFIQ
     #include "SDR_RS_HFIQ.h"   // https://github.com/K7MDL2/Teensy4_USB_Host_RS-HFIQ_Library
 #elif defined USE_CAT_PORT
     #include "SDR_CAT_Serial.h"
 #endif
+
+#define useUSBHostSerial_A      // set for Teensy USB Serial CAT port ch 'A'
+#define TEENSY4                 // tell CIV lib to use Teensy USB Host
 
 // Simple ways to designate functions to run out of fast or slower memory to help save RAM
 #define HOT     FASTRUN     __attribute__((hot))
@@ -643,5 +654,96 @@ struct EncoderList {
     uint8_t     tap;        // The "client" action for one of the encoder switches when tapped- Set to 0 if no encoder is wired up
     uint8_t     press;      // The "client" action for one of the encoder switches when pressed (longer push) - Set to 0 if no encoder is wired up
 };   
+
+/* 
+ICradio_test - a_Defines.h
+*/
+
+// Global compile switches ===================================================================================
+
+#define VERSION_STRING "CIVbusLib ICradio_selRadioTest V0_8 22/05/04"
+
+// common switches -----------------------------------
+
+// if defined, debug messages on the serial line will be generated
+#define debug 
+
+// some general defines ----------------------------------
+
+enum onOff_t:uint8_t {
+	OFF1 = 0,
+	ON1  = 1,
+    UNDEF
+};
+
+enum keyPressed_t:uint8_t {
+    NO_KEY_PRESSED 		= 0,
+    KEY_EIN_PRESSED,
+    KEY_AUS_PRESSED,
+    KEY_VOICE_PRESSED,
+    KEY_DATA_PRESSED,
+    KEY_MODE_PRESSED,
+    KEY_FREQ_PRESSED,
+    KEY_MODMODE_PRESSED,
+    KEY_HELP_PRESSED,
+    KEY_LOG_PRESSED
+};
+
+// For CIV commands
+
+// translation of the radio's general mode
+const String ModeStr[3] = {
+  "MODE_NDEF",
+  "MODE_VOICE",
+  "MODE_DATA"
+};
+
+// states of radio's DC-Power (on/Off State)
+const String radioOnOffStr[6] = {
+  "RADIO_OFF",
+  "RADIO_ON",
+  "RADIO_OFF_TR",     // transit from OFF to ON
+  "RADIO_ON_TR",      // transit from ON to OFF
+  "RADIO_NDEF",       // don't know
+  "RADIO_TOGGLE"
+};
+
+// clear test translation of the modulation modes
+const String modModeStr[11] = {
+  "LSB   ", // 00 (00 .. 08 is according to ICOM's documentation) 
+  "USB   ", // 01
+  "AM    ", // 02
+  "CW    ", // 03
+  "RTTY  ", // 04
+  "FM    ", // 05
+  "WFM   ", // 06
+  "CW-R  ", // 07
+  "RTTY-R", // 08
+  "DV    ", // 09 (Note: on the ICOM CIV bus, this is coded as 17 in BCD-code, i.e. 0x17)
+  "NDEF  "  // 10
+};
+
+// clear text translation of the Filter setting
+const String FilStr[4] = {
+  "NDEF",
+  "FIL1",   // 1 (1 .. 3 is according to ICOM's documentation)
+  "FIL2",
+  "FIL3"
+};
+
+// repeat time of the baseloop actions in ms
+#define BASELOOP_TICK 10 
+
+// Debugging ...
+
+#ifdef debug
+  #define SET_TIME_MARKER1 G_timemarker1 = micros();
+  #define EVAL_TIME_MARKER1 G_timemarker1a = micros();Serial.print("t1:  ");Serial.println(G_timemarker1a-G_timemarker1);
+#endif
+
+#ifndef debug
+  #define SET_TIME_MARKER1
+  #define EVAL_TIME_MARKER1
+#endif
 
 #endif //_IC_905_H_
