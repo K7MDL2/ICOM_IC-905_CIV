@@ -297,6 +297,9 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define BW3_2       7
 #define BW4_0       8
 #define BW6_0       9
+#define FIL1        1
+#define FIL2        2
+#define FIL3        3
 #define VFO_A       1
 #define VFO_B       0
 
@@ -318,7 +321,7 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define NTCH2       2
 
 // This group defines the number of records in each structure
-#define MODES_NUM   8
+#define MODES_NUM   11
 #define FREQ_DISP_NUM  4
 #define BANDS       26
 #define XVTRS       15
