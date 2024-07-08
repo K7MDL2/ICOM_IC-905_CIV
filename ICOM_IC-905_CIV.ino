@@ -180,6 +180,8 @@ Metro TX_Timeout           = Metro(180000); // 180000 is 3 minutes for RunawayTX
 Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT comms
 Metro CAT_Poll             = Metro(1000);  // Throttle the servicing for CAT comms
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
+Metro CAT_Freq_Check       = Metro(500);   // Clear the CIV log buffer
+
 uint64_t    xvtr_offset             = 0;
 int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
 int16_t     xit_offset              = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
@@ -530,12 +532,6 @@ void setup()
     DPRINTLN(fft_size);
     DPRINTLNF("**** Running I2C Scanner ****");
 
-    civ.setupp(true, false, "");      // initialize the civ object/module
-                                      // and the ICradio objects
-
-    civ.registerAddr(CIV_ADDR_905);    // tell civ, that this is a valid address to be used
-
-
     // ---------------- Setup our basic display and comms ---------------------------
     Wire.begin();
     Wire.setClock(100000UL); // Keep at 100K I2C bus transfer data rate for I2C Encoders to work right
@@ -668,13 +664,22 @@ void setup()
 
     while (!Serial && (millis() < 5000)) ; // wait for Arduino Serial Monitor
     PC_Debug_port.println("\n\nUSB Host Testing - Serial V0.2");
+    tft.setCursor(70, 300);
+    tft.setFont(Arial_20_Bold);
+    tft.setTextColor(WHITE);
+    tft.print("Initializing USB Host port to Radio - Cable Connected?");
+    
+    civ.setupp(true, false, "");      // initialize the civ object/module
+                                      // and the ICradio objects
+
+    civ.registerAddr(CIV_ADDR_905);    // tell civ, that this is a valid address to be used
     
     counter = 0;
     //disp_Menu();
 
     PC_Debug_port.println("End of Setup");
 
-    //FrequencyRequest();
+    FrequencyRequest();
 
      // -------- Read SD Card data----------------------------------------------------------
     // To use the audio card SD card Reader instead of the Teensy 4.1 onboard Card Reader
@@ -683,14 +688,14 @@ void setup()
     //SPI.setSCK(14);  // Audio shield has SCK on pin 14
 
     // see if the card is present and can be initialized:
-    //SD_CardInfo();
+    SD_CardInfo();
     // open or create our config file.  Filenames follow DOS 8.3 format rules
-    //Open_SD_cfgfile();
+    Open_SD_cfgfile();
     // test our file
     // make a string for assembling the data to log:
     //write_db_tables();
-    //read_db_tables();              // Read in stored values to memory
-    //write_radiocfg_h();         // write out the #define to a file on the SD card.
+    read_db_tables();              // Read in stored values to memory
+    write_radiocfg_h();         // write out the #define to a file on the SD card.
                                     // This could be used by the PC during compile to override the RadioConfig.h
 
     // -------- Setup our radio settings and UI layout --------------------------------
@@ -792,28 +797,28 @@ void loop()
         CIVresultL = civ.readMsg(CIV_ADDR_905);
         if (CIVresultL.retVal<=CIV_NOK) {               // valid answer received !           
             #ifdef debug
-              //Serial.print('.');
+              //DPRINTF('.');
             #endif
             if (CIVresultL.retVal==CIV_OK_DAV) {          // Data available
                 // Frequency
                 if ((CIVresultL.cmd[1]==CIV_C_F_SEND[1]) ||  // command CIV_C_F_SEND received
                     (CIVresultL.cmd[1]==CIV_C_F_READ[1])) {  // command CIV_C_F_READ received
                     freqReceived = true;
-                    PC_Debug_port.print(" Frequency: "); PC_Debug_port.println(CIVresultL.value);
+                    DPRINTF("CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
                     freq = (uint64_t) CIVresultL.value;
                     VFOA = freq;
                     formatVFO(VFOA);
                     FreqToBandRules();
+                    changeBands(0);
                     //bandSET();
                     displayFreq();                        
                 } // command CIV_C_F_SEND or CIV_C_F_READ received  
-                else
-                // Mode
-                if ((CIVresultL.cmd[1]==CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
+                // Test for MODE change
+                else if ((CIVresultL.cmd[1]==CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
                     (CIVresultL.cmd[1]==CIV_C_MOD_READ[1])) {  // command CIV_C_MODE_READ received
                     modeReceived = true;
-                    PC_Debug_port.print("Mode Changed: ");
-                    PC_Debug_port.println((uint8_t) CIVresultL.value);
+                    DPRINTF("Mode Changed: ");
+                    DPRINTLN((uint8_t) CIVresultL.value);
                     selectMode((uint8_t) CIVresultL.value); // Select the mode for the Active VFO
                 }
             } // Data available
@@ -821,13 +826,13 @@ void loop()
 
         // ----------------------------------  do a query for frequency, if necessary
         // poll every 500 * 10ms = 5sec until a valid frequency has been received
-        if ( (freqReceived == false) && ((lpCnt%500)==0) ) { 
+        if ( (freqReceived == false) && (CAT_Freq_Check.check() == 1) ) { 
             civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
-            freqPoll++;
-            Serial.println("P ");
+            //if (CIVresultL.retVal<=CIV_NOK)
+            DPRINTF("Poll for RADIO Frequency Status: "); DPRINTLN(CIVresultL.retVal);
+            DPRINTF("Poll for RADIO Frequency Return Value: "); DPRINTLN((uint8_t) CIVresultL.value);
         }
         
-        lpCnt++;
         time_last_baseloop = time_current_baseloop;
 	//} // if BASELOOP_TICK
 
@@ -987,11 +992,12 @@ void RcvCIVmsg(void)
         //PC_Debug_port.print("retVal: ");      PC_Debug_port.print(retValStr[CIVresultL.retVal]);
         if (CIVresultL.retVal==CIV_OK_DAV) // Data available
         {
-            PC_Debug_port.print(" Frequency: "); PC_Debug_port.println(CIVresultL.value);
+            DPRINTF("RcvCIVMsg: Frequency: "); DPRINTLN(CIVresultL.value);
             freq = (uint64_t) CIVresultL.value;
             VFOA = freq;
             formatVFO(VFOA);
             FreqToBandRules();
+            changeBands(0);
             //bandSET();
             displayFreq();
         }
@@ -1004,7 +1010,7 @@ void RcvCIVmsg(void)
 void FrequencyRequest(){
   #if defined(REQUEST)
   if(REQUEST > 0 && (millis() - RequestTimeout[0] > RequestTimeout[1])){
-    //CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
     PC_Debug_port.print("retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL.retVal]);
     RequestTimeout[0]=millis();
   }
