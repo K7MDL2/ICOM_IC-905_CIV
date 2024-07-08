@@ -439,14 +439,17 @@ struct Filter_Settings filter[FILTER] = {
 
 //Remember filter per mode  Last field "Width" is writable
 struct Modes_List modeList[MODES_NUM] = {
-    {0, "CW    ", BW0_7},
-    {1, "CW-R  ", BW0_7},
-    {2, "USB   ", BW2_8},
-    {3, "LSB   ", BW2_8},
-    {4, "DATA  ", BW3_2},
-    {5, "DATA-R", BW4_0},
-    {6, "AM    ", BW6_0},
-    {7, "FM    ", BW6_0}
+    {0, "LSB   ", BW2_8},
+    {1, "USB   ", BW2_8},
+    {2, "AM    ", BW6_0},
+    {3, "CW    ", BW0_7},
+    {4, "RTTY  ", BW4_0},
+    {5, "FM    ", BW6_0},
+    {7, "CW-R  ", BW0_7},
+    {8, "RTTY-R", BW4_0},
+    {17,"DV    ", BW6_0},
+    {22,"DD    ", BW6_0},
+    {23,"ATV   ", BW6_0}
  };
 
 struct TuneSteps  tstep[TS_STEPS] = {
