@@ -35,6 +35,10 @@ If using digital modes on a PC and audio is desired, use the LAN connection.  It
 
 This is minimally tested on my bench and will require some code customization to output the IO pin pattern you need.  Feel free to open Issues on the GitHub repository.  I intend to package one up later on for my use.
 
+------------------------------------------------------------------------------------------------------------------
+
+Dev update details:   This is still a early work in progress, changes can happen fast!
+
 July 2024 Updates
 
 Pulled in my Teensy SDR code and stubbed out audio and spectrum and PLL related code. Runnig the code on one of my Teensy SDR chassis (7" for now) since it has all the hardware needed.  I copy the extracted CI-V bus radio frequency into VFOA on the SDR chassis for display.  The encoders and swicthes change things on the display thinking it is still an SDR, but they have no effect today. Next steps are to extract other radio settings of interest and pull in the Band decoder project code.  Key features I want first up ande band menu select, VFO A and B display and control with teh VFO knobs, display mode, filter, and then add ability to control the radio more fully. Buffered IO hardware will be added to control antennas, transverters and amps.
@@ -75,3 +79,7 @@ Hooking this box up is simple.  Plug a USB Type-A cable into the Teensy 4.X host
 In theory it can work without any screen or encoders and act just as a band decoder once that code is added.  A read-only Screen at minimum, could be an OLED, or character LCD even. I think the touch screen, switches, and encoders will offer good value for things like CW macros, quick bands changes, more accurate touch tuning, less menu hunting.  Things like external amp temp and power can be read and displayed, perhaps over hardware serial or i2C bus connections.
 
 I added a new folder containing my modified version of the CI-V library for the 905 and bands > 2GHz.  You can copy them to your normal Arduino libraries folder.  I expect they will need further udpates as I go, especially as I add higher level command support.
+
+7/8/2024
+
+Made several fixes.  Can now bidirectionally tune from either end on all bands including 10Ghz, followsws the configured band map.  The SD card config read at startup is bypassed until dev changes are stabilized more.  Next up are getting mode and filter to align.  There is a long list of settings and status stuff that I could sync with the radio (both directions) given time to code it up, mostly now a matter of priority order vs time vs usefulness.
