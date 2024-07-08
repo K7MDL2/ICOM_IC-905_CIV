@@ -64,9 +64,9 @@ COLD void SetFreq(uint64_t Freq)
     };
 
     formatFreq(Freq);  // Convert
-    PC_Debug_port.printf(" hex in SetFreq: %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
+    //PC_Debug_port.printf("VFO: hex in SetFreq: %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
     CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, CIV_C_F1_SEND, vfo_dec, CIV_wFast);
-    PC_Debug_port.print("retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL_vfo.retVal]);
+    //PC_Debug_port.print("VFO: retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL_vfo.retVal]);
 }
 
 extern unsigned int hexToDec(String hexString);
@@ -82,21 +82,21 @@ void formatFreq(uint64_t vfo)
     char f1KHz[3] = {} ;
     char f10Hz[3] = {};
 
-    PC_Debug_port.printf("raw vfo uint64 value: %llu\n", vfo);
+    //PC_Debug_port.printf("VFO: raw vfo uint64 value: %llu\n", vfo);
 
     lltoa(vfo,vfo_str,DEC);
 
     if (vfo < 10000000000)
     {
         sprintf(vfo_str1, "%010s", vfo_str);
-        PC_Debug_port.printf("after lltoa conversion: %s\n",vfo_str1);
+        //PC_Debug_port.printf("VFO: after lltoa conversion: %s\n",vfo_str1);
         memcpy(f1GHz,   &vfo_str1[0], 2);
         memcpy(f10MHz,  &vfo_str1[2], 2);
         memcpy(f100KHz, &vfo_str1[4], 2);
         memcpy(f1KHz,   &vfo_str1[6], 2);
         memcpy(f10Hz,   &vfo_str1[8], 2);
-        PC_Debug_port.printf("memcpy = 05 %02s %02s %02s %02s %02s\n",f10Hz, f1KHz, f100KHz, f10MHz, f1GHz);
-        PC_Debug_port.print("05");  PC_Debug_port.print(f10Hz);  PC_Debug_port.print(f1KHz);  PC_Debug_port.print(f100KHz);  PC_Debug_port.print(f10MHz);  PC_Debug_port.print(f1GHz); PC_Debug_port.println();
+        //PC_Debug_port.printf("VFO: memcpy = 05 %02s %02s %02s %02s %02s\n",f10Hz, f1KHz, f100KHz, f10MHz, f1GHz);
+        PC_Debug_port.print("VFO: < 10GHz band - 05");  PC_Debug_port.print(f10Hz);  PC_Debug_port.print(f1KHz);  PC_Debug_port.print(f100KHz);  PC_Debug_port.print(f10MHz);  PC_Debug_port.print(f1GHz); PC_Debug_port.println();
         
         vfo_dec[0] = (uint8_t) 0x05;
         vfo_dec[1] = (uint8_t) hexToDec(f10Hz);
@@ -104,21 +104,20 @@ void formatFreq(uint64_t vfo)
         vfo_dec[3] = (uint8_t) hexToDec(f100KHz);
         vfo_dec[4] = (uint8_t) hexToDec(f10MHz);
         vfo_dec[5] = (uint8_t) hexToDec(f1GHz);
-        
-        PC_Debug_port.printf(" < 10Ghz Bands - Reversed hex to DEC byte %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5]);
+        //PC_Debug_port.printf("VFO: < 10Ghz Bands - Reversed hex to DEC byte %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5]);
     }
     else  // Must be 10Gh or higher band
     {
         sprintf(vfo_str1, "%012s", vfo_str);
-        PC_Debug_port.printf("after lltoa conversion: %s\n",vfo_str1);
+        //PC_Debug_port.printf("VFO: after lltoa conversion: %s\n",vfo_str1);
         memcpy(f100GHz, &vfo_str1[0], 2);
         memcpy(f1GHz,   &vfo_str1[2], 2);
         memcpy(f10MHz,  &vfo_str1[4], 2);
         memcpy(f100KHz, &vfo_str1[6], 2);
         memcpy(f1KHz,   &vfo_str1[8], 2);
         memcpy(f10Hz,   &vfo_str1[10], 2);
-        PC_Debug_port.printf("10GHz+ memcpy = 06 %02s %02s %02s %02s %02s %02s\n",f10Hz, f1KHz, f100KHz, f10MHz, f1GHz, f100GHz);
-        PC_Debug_port.print("06");  PC_Debug_port.print(f10Hz);  PC_Debug_port.print(f1KHz);  PC_Debug_port.print(f100KHz);  PC_Debug_port.print(f10MHz);  PC_Debug_port.print(f1GHz); PC_Debug_port.print(f100GHz); PC_Debug_port.println();
+        //PC_Debug_port.printf("VFO: 10GHz+ memcpy = 06 %02s %02s %02s %02s %02s %02s\n",f10Hz, f1KHz, f100KHz, f10MHz, f1GHz, f100GHz);
+        PC_Debug_port.print("VFO: > 10GHz band - 06");  PC_Debug_port.print(f10Hz);  PC_Debug_port.print(f1KHz);  PC_Debug_port.print(f100KHz);  PC_Debug_port.print(f10MHz);  PC_Debug_port.print(f1GHz); PC_Debug_port.print(f100GHz); PC_Debug_port.println();
         
         //vfo_dec[6] = 0U;
         vfo_dec[0] = (uint8_t) 0x06;
@@ -128,7 +127,6 @@ void formatFreq(uint64_t vfo)
         vfo_dec[4] = (uint8_t) hexToDec(f10MHz);
         vfo_dec[5] = (uint8_t) hexToDec(f1GHz);
         vfo_dec[6] = (uint8_t) hexToDec(f100GHz);
-        
-        PC_Debug_port.printf(" 10G+ Bands = Reversed hex to DEC byte %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
+        //PC_Debug_port.printf(" VFO: > 10G Bands = Reversed hex to DEC byte %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
     }
 }
