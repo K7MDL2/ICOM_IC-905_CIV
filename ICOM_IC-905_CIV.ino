@@ -699,7 +699,7 @@ void setup()
     // This woudl occur when you change the structures in SDR_DAta.h
     // You can force a clean default values write here.
     
-    //write_db_tables();
+    write_db_tables();   // comment out for normal operation.  Often best to leave in for dev.
 
     // Resume normal read user value into memory overwriting defaults.
     read_db_tables();              // Read in stored values to memory
@@ -816,9 +816,8 @@ void loop()
                     freq = (uint64_t) CIVresultL.value;
                     VFOA = freq;
                     formatVFO(VFOA);
-                    FreqToBandRules();
-                    changeBands(0);
-                    //bandSET();
+                    if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands is VFO is in the current band
+                        changeBands(0);
                     displayFreq();                        
                 } // command CIV_C_F_SEND or CIV_C_F_READ received  
                 // Test for MODE change
@@ -1004,8 +1003,8 @@ void RcvCIVmsg(void)
             freq = (uint64_t) CIVresultL.value;
             VFOA = freq;
             formatVFO(VFOA);
-            FreqToBandRules();
-            changeBands(0);
+            if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands if freq in current band
+                changeBands(0);
             //bandSET();
             displayFreq();
         }
@@ -1044,7 +1043,7 @@ unsigned int hexToDec(String hexString) {
 //---------------------------------------------------------------------------------------------------------
 
 
-void FreqToBandRules()
+void FreqToBandRules(uint64_t freq)
 {
 return;
          if (freq >=Freq2Band[0][0] && freq <=Freq2Band[0][1] )  {BAND=1;}  // 160m
