@@ -241,11 +241,18 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     DPRINTF("changeBands: curr_band is "); DPRINTLN(bandmem[curr_band].band_name); 
 
     if (direction != 0)
+    {
         VFOA = bandmem[curr_band].vfo_A_last; // last used frequencies
+        DPRINTF("changeBands: Direction not 0, Last used VFOA is "); DPRINTLN(VFOA);
+    }
     else
+    {
         if (!find_new_band(VFOA, curr_band))  // returns 0 when out of band
+        {
             VFOA = bandmem[curr_band].vfo_A_last;   // keep last valid frequency
-
+            DPRINTF("changeBands: after find new band, Last used VFOA is "); DPRINTLN(VFOA);
+        }
+    }
     DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  New VFOA is "); DPRINTLN(VFOA);
     
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
