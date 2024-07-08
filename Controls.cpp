@@ -203,13 +203,13 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     int8_t target_band;
     // TODO search bands column for match to account for mapping that does not start with 0 and bands could be in odd order and disabled.
 
-    DPRINTF("\nChangeBand: Incoming Band is "); DPRINTLN(bandmem[curr_band].band_name); DPRINTF("  Current Freq is "); DPRINT(VFOA); DPRINTF("  Current Last_VFOA is "); DPRINTLN(bandmem[curr_band].vfo_A_last);
+    DPRINTF("\nchangeBands: Incoming Band is "); DPRINTLN(bandmem[curr_band].band_name); DPRINTF("  Current Freq is "); DPRINT(VFOA); DPRINTF("  Current Last_VFOA is "); DPRINTLN(bandmem[curr_band].vfo_A_last);
 
     Split(0);
 
     target_band = bandmem[curr_band].band_num + direction;
     // target_band = curr_band + direction;
-    DPRINTF("ChangeBand: Proposed Target Band is "); DPRINTLN(bandmem[target_band].band_name);
+    DPRINTF("changeBands: Proposed Target Band is "); DPRINTLN(bandmem[target_band].band_name);
 
     uint16_t top_band    = BANDS-1;
     uint16_t bottom_band = 0;
@@ -225,12 +225,12 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 
         if (bandmem[target_band].bandmap_en)
         {
-            DPRINTF("ChangeBand: Target band index "); DPRINT(target_band); DPRINTF(" is in the Bandmap. Target band is "); DPRINTLN(bandmem[target_band].band_name);
+            DPRINTF("changeBands: Target band index "); DPRINT(target_band); DPRINTF(" is in the Bandmap. Target band is "); DPRINTLN(bandmem[target_band].band_name);
             break;
         }
         else
         {
-            DPRINTF("ChangeBand: Target band "); DPRINT(bandmem[target_band].band_name); DPRINTLNF(" NOT in Bandmap. Trying next Band.");
+            DPRINTF("changeBands: Target band "); DPRINT(bandmem[target_band].band_name); DPRINTLNF(" NOT in Bandmap. Trying next Band.");
             target_band += direction; // maintain change direction up or down.
             if (direction == 0) 
                 target_band +=1;  // force a search of current is invalid, possible if VFO set externally to disabled band
@@ -238,23 +238,24 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     }
 
     curr_band = target_band; // We have a good band so can new band
+    DPRINTF("changeBands: curr_band is "); DPRINTLN(bandmem[curr_band].band_name); 
 
     if (direction != 0)
-        VFOA = bandmem[curr_band].vfo_A_last; // up the last used frequencies
+        VFOA = bandmem[curr_band].vfo_A_last; // last used frequencies
     else
         if (!find_new_band(VFOA, curr_band))  // returns 0 when out of band
             VFOA = bandmem[curr_band].vfo_A_last;   // keep last valid frequency
 
-    DPRINTF("ChangeBand: New Band is "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  New VFOA is "); DPRINTLN(VFOA);
+    DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  New VFOA is "); DPRINTLN(VFOA);
     
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
     if (bandmem[curr_band].xvtr_IF)
         xvtr_offset = bandmem[curr_band].edge_lower - bandmem[bandmem[curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
     else
         xvtr_offset = 0;
-    DPRINTF("ChangeBand: xvtr_offset is "); DPRINTLN(xvtr_offset);
+    DPRINTF("changeBands: xvtr_offset is "); DPRINTLN(xvtr_offset);
 
-    DPRINTLNF("ChangeBand: Set RIT if On");
+    DPRINTLNF("changeBands: Set RIT if On");
     if (bandmem[curr_band].RIT_en)
         setRIT(1); // turn on if it was on before.   Also calls selectFrequency(0);
     else
@@ -266,14 +267,14 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 
     //codec1.muteHeadphone(); // remove audio thumps during hardware transients
 
-    DPRINTLNF("ChangeBand: Set other per band settings");
+    DPRINTLNF("changeBands: Set other per band settings");
     // Split(0);
     setAtten(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     //selectBandwidth(bandmem[curr_band].filter);
     // dB level is set elsewhere and uses value in the dB in this function.
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     // selectMode(0);
-    DPRINTLNF("ChangeBand: Set Mode");
+    DPRINTLNF("changeBands: Set Mode");
     setMode(2);  // 0 is set value in database for both VFOs
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
@@ -296,7 +297,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     write_db_tables();
     displayRefresh();
     //codec1.unmuteHeadphone(); // reduce audio thump from hardware transitions
-    DPRINTLNF("ChangeBand: Complete\n");
+    DPRINTLNF("changeBands: Complete\n");
 }
 
 //
@@ -2021,7 +2022,7 @@ void setEncoderMode(uint8_t role)
 COLD void digital_step_attenuator_PE4302(int16_t _atten)
 {
     #ifndef PE4302
-        DPRINTLN(F("Error: PE4302 digital step attenuator not configured, exiting"));
+        DPRINTLN(F("PE4302 digital step attenuator not configured, skipping"));
         return; // Wrong hardware if not PE4302
     #else
 
@@ -2088,9 +2089,15 @@ COLD void digital_step_attenuator_PE4302(int16_t _atten)
 // Changes to the correct band settings for the new target frequency.
 // If the new frequency is below or above the band limits it returns a value of 0
 //
+//#define DBG
 HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
 {
     int i;
+
+    #ifdef DBG
+        DPRINTF("find_band(): New Frequency requested = "); DPRINTLN(new_frequency);
+        DPRINTF("find_band(): New Band requested = "); DPRINTLN(_curr_band);
+    #endif
 
     for (i=BANDS-1; i>=0; i--)    // start at the top and look for first band that VFOA fits under bandmem[i].edge_upper
     {
