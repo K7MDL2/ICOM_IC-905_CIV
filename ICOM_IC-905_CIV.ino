@@ -693,7 +693,15 @@ void setup()
     Open_SD_cfgfile();
     // test our file
     // make a string for assembling the data to log:
+
+    // Normally just read config from SD card assuming it is not corrupt.
+    // There mnaybe times yu want to force a copy from default memory (SDR_DATA.h defaults) at bootup overriding what is on the SD card
+    // This woudl occur when you change the structures in SDR_DAta.h
+    // You can force a clean default values write here.
+    
     //write_db_tables();
+
+    // Resume normal read user value into memory overwriting defaults.
     read_db_tables();              // Read in stored values to memory
     write_radiocfg_h();         // write out the #define to a file on the SD card.
                                     // This could be used by the PC during compile to override the RadioConfig.h
