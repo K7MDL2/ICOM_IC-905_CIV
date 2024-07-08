@@ -86,7 +86,7 @@ void formatFreq(uint64_t vfo)
 
     lltoa(vfo,vfo_str,DEC);
 
-    if (vfo < 10000000000)
+    if (vfo < 10000000000LL)
     {
         sprintf(vfo_str1, "%010s", vfo_str);
         //PC_Debug_port.printf("VFO: after lltoa conversion: %s\n",vfo_str1);
