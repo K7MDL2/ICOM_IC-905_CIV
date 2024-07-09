@@ -20,9 +20,6 @@ extern Metro popup_timer; // used to check for popup screen request
     extern FT5206       cts;
     uint8_t registers[FT5206_REGISTERS];
 #endif
-extern void RampVolume(float vol, int16_t rampType);
-//extern void Spectrum_Parm_Generator(int);
-//extern struct Spectrum_Parms Sp_Parms_Def[];
 extern uint8_t curr_band;   // global tracks our current band setting.  
 extern struct Band_Memory bandmem[];
 extern struct User_Settings user_settings[];
@@ -30,11 +27,9 @@ extern struct Filter_Settings filter[];
 extern struct Standard_Button std_btn[];
 extern struct Label labels[];
 extern uint8_t user_Profile;
-//extern AudioControlSGTL5000 codec1;
 extern uint8_t popup;
 extern void set_MF_Service(uint8_t client_name);
 extern struct Frequency_Display disp_Freq[];
-//extern AudioSynthWaveformSine_F32 sinewave1; // for audible alerts like touch beep confirmations
 extern void touchBeep(bool enable);
 extern bool MeterInUse;  // S-meter flag to block updates while the MF knob has control
 extern bool MF_default_is_active;

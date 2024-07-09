@@ -71,11 +71,6 @@
 
 // Below are local project files
 #include "RadioConfig.h"        // Our main configuration file
-#ifndef BYPASS_SPECTRUM_MODULE
-    #include "Spectrum_RA887x.h"    // Library has been merged into the main code, no library download required as of May 7, 2022
-    //#include <Spectrum_RA887x.h>    // New K7MDL Spectrum and Waterfall library created Jan 2022 (only for builds before May  7, 2022)
-                                  // https://github.com/K7MDL2/Spectrum_RA887x_Library
-#endif
 //#include "SDR_Network.h"        // for ethernet UDP remote control and monitoring
 #include "Vfo.h"
 #include "Display.h"
@@ -87,12 +82,6 @@
 //#include "Bandwidth2.h"
 #include "SD_Card.h"
 
-#if defined USE_RS_HFIQ
-    #include "SDR_RS_HFIQ.h"   // https://github.com/K7MDL2/Teensy4_USB_Host_RS-HFIQ_Library
-#elif defined USE_CAT_PORT
-    #include "SDR_CAT_Serial.h"
-#endif
-
 #define useUSBHostSerial_A      // set for Teensy USB Serial CAT port ch 'A'
 #define TEENSY4                 // tell CIV lib to use Teensy USB Host
 
@@ -100,7 +89,6 @@
 #define HOT     FASTRUN     __attribute__((hot))
 #define COLD    FLASHMEM    __attribute__((cold))
 
-//#ifndef BYPASS_SPECTRUM_MODULE
 //
 //--------------------------------- RA8875 LCD TOUCH DISPLAY INIT & PINS --------------------------
 //
@@ -141,8 +129,6 @@
         #define  RA8876_RESET       9   //any pin or nothing!
         #define  MAXTOUCHLIMIT      3   //1...5  using 3 for 3 finger swipes, otherwise 2 for pinches or just 1 for touch              
     #endif // USE_RA8876_t3
-
-//#endif // BYPASS_SPECTRUM_MODULE
 
 // From RA8876_t3/RA8876Registers.h
 #define BLACK		  0x0000

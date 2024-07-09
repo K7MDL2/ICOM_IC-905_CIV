@@ -4,25 +4,31 @@
 //
 //    USB Band Decoder for IC-905
 //    Original June 23, 2023 by K7MDL
-//    Updated July 2024 to display on a touchscreen radio frequency.
+//    Updated July 2024 to display on a touchscreen radio frequency and use optional encoders, buttons for expanded remote control of a CI-V controlled radio
 //      Eventuallly control the radio over CIV and to extract GPS time and location data for display.
 // 
-//  Connect IC-905 to Teensy Host port.
-//  Connect PC to Teensy USB
-//  Connect Teensy IO pins to buffers and devices for band specific control
-//  3 USB Serial ports used.  1 = Debug, 2= CAT, 3 = GPS data
+//  Usage: 
+//    Connect IC-905 to Teensy Host port.
+//    Connect PC to Teensy USB
+//    Connect Teensy IO pins to buffers and devices for band specific control
+//    3 USB Serial ports created on the PC side.  
+//      1 = Debug,
+//      2 = CAT (passed through to PC as well as shared by this controller - both bidirectional - some conflict management required),
+//      3 = GPS data (passed through to PC)
 //
-//  Includes modified code from RemoteTH.com - see below
+//  Includes modified CI-V library code from CIVMasterLib  https://github.com/WillyIoBrok/CIVmasterLib
+//    Modifed to include IC-905 support for 5GHz and 10GHz and higher bands which require uint64_t size frequency variable and 12 bytes in the frequency strings for band over 10.0GHz.
+//    Still uses the 10bytes for bands < 10.0GHz.
 //
-//  Modified 4/2021 for SDR/Panadapter usage by K7MDL
-//  Modified heavily 6/2023 to specialize as a IC-905 USB band decoder
-//  Passes through 2 serial interfaces and taps into the CI-V frequency value to operate band decode outputs on GPIO pins.
-//  IC-905 connects to Teensy host port which today cannot handle audio, so only teh serial ports are dealt with. 
-//  Can use the IC-905 LAN connection to a PC for full audio anbd serial control, LAN operates in parallel with the USB OK.
+//  This project imports heavily from my Teensy SDR for touchscreen, encoder and USB Host code, RF Wattmater/Band Decoder
+//  and modified heavily 6/2023 to specialize as a IC-905 USB band decoder
+//  Passes through 2 serial interfaces (IC-905 calls it ch A and ch B) and taps into the CI-V frequency value to operate band decode outputs on GPIO pins.
+//  IC-905 connects to Teensy USB host port which today cannot handle audio, so only the serial ports are dealt with. 
+//  Can use the IC-905 LAN connection to a PC for full audio and serial control, LAN operates in parallel with the USB OK.
 //  Could generate PTT (aka SEND) from the CI-V messages and combine in software for per-band PTT outputs.  
-//  I have seen some say they identified and broke out the 'SEND" or PTT signal on the RF unit cable but still band specific filtering.
+//  I have seen some say they identified and broke out the 'SEND" or PTT signal on the RF unit cable but still need band specific filtering.
 //  Ideally the RF Unit would have band decode IO signals available using some of its spare accessory connector pins.  These pins are "Do Not Connect" 
-//     suggesting they may be connected to something inside for future use.
+//     suggesting they may be connected to something inside for future use.  Schematics reveal they appear to be comm data lines and power for the 10G transverter.
 //
 //***************************************************************************************************
 
@@ -36,8 +42,8 @@
 #include <Wire.h>                       // from Arduino
 #include <TimeLib.h>                    // from Arduino
 #include <CIVcmds.h>                    // ICm CIV library https://github.com/WillyIoBrok/CIVmasterLib
-#include <CIVmaster.h> // CIVcmds.h is automatically included in addition
-#include <ICradio.h>    // this would include CIVcmds.h and CIVmaster.h, if not included before !
+#include <CIVmaster.h>                  // CIVcmds.h is automatically included in addition
+#include <ICradio.h>                    // this would include CIVcmds.h and CIVmaster.h, if not included before !
 
 // External libraries - These are not all of them as some appear with #ifdef blocks based on feature selection - See Github Wiki "Libraries" page for a full listing.
 #define  ENCODER_OPTIMIZE_INTERRUPTS    // leave this one here.  Not normally user changed
@@ -252,263 +258,6 @@ uint8_t       	localM      = MOD_NDEF;
 uint8_t       	radioFil    = FIL_NDEF;
 uint8_t       	localFil    = FIL_NDEF;
 
-uint32_t VoltageRefresh[2] = {0, 3000};   // refresh in ms
-float ArefVoltage = 4.303;            // Measure on Aref pin 20 for calibrate
-float Divider = 1;
-
-/*
-// Modified 4/2021 for SDR/Panadapter usage by K7MDL
-// Modified heavily 6/2023 to specialize as a IC-905 USB band decoder
-// Passes through 2 serial interfaces and tap into the CI-V frequency value to operate band decode outputs
-// The audio interface of the 905 USB cannot be passed thoriugh due to limitation of the Teensy USB Host library today.  
-// Can use LAN as a workaround in parallel.
-
-  Band decoder MK2 with TRX control output for Arduino
------------------------------------------------------------
-  https://remoteqth.com/wiki/index.php?page=Band+decoder+MK2
-
-  ___               _        ___ _____ _  _
- | _ \___ _ __  ___| |_ ___ / _ \_   _| || |  __ ___ _ __
- |   / -_) '  \/ _ \  _/ -_) (_) || | | __ |_/ _/ _ \ '  \
- |_|_\___|_|_|_\___/\__\___|\__\_\|_| |_||_(_)__\___/_|_|_|
-
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 2 of the License, or
-    (at your option) any later version.
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-Features:
-Support inputs
-  * PTT detector - if PTT on, outputs not change
-  * SERIAL terminal (ASCII)
-  * ICOM CI-V
-  * KENWOOD - CAT
-  * FLEX 6000 CAT series
-  * YAESU / ELECRAFT BCD
-  * ICOM ACC voltage
-  * YAESU CAT - TRX since 2008 ascii format
-  * YAESU CAT old binary format (tested on FT-817)
-  * IP relay with automatic pair by rotary encoder ID https://remoteqth.com/wiki/index.php?page=IP+Switch+with+ESP32-GATEWAY
-
-Outputs
-  * 14 local relay
-  * 14 remote relay
-  * Yaesu BCD
-  * Serial echo
-  * Icom CIV
-  * Kenwood CAT
-  * YAESU CAT - TRX since 2008 ascii format
-  * IP relay with automatic pair by rotary encoder ID
-  * PTT by band - distributed PTT to output, dependency by frequency - TNX Tim W4YN
-  * Analog (PWM) output by  preset table
-
-  Major changes
-  -------------
-  - LCD support
-  - Icom with request mode
-  - PTT input block changes during transmit
-  - own board with all smd parts including arduino nano module
-  - without relays, only control driver outputs
-  - optional ethernet module
-
-  Changelog
-  ---------
-  2021-02 add 23cm (IC9700) Icom state machine
-  2020-10 PWM (analog) output
-  2020-07 PTT by band
-  2020-02 fix out set
-  2019-11 YAESU / ELECRAFT input BCD format
-  2018-03 manual switch between four output on same band by BCD input - TNX ZS1LS behind inspiration
-  2018-12 PTT bug fix
-          LCD PCF8574 support
-          copy YAESU CAT from old code
-          added YAESU FT-100 support
-  2018-11 support FLEX 6000 CAT series
-  2018-06 support IP relay
-  2018-05 mk2 initial release
-
-*/
-//=====[ Inputs ]=============================================================================================
-
-// #define INPUT_BCD            // TTL BCD in A
-//int BcdInputFormat = 0;         // if enable INPUT_BCD, set format 0 - YAESU, 1 ELECRAFT
-// #define ICOM_ACC             // voltage 0-8V on pin4 ACC(2) connector - need calibrate table
-// #define INPUT_SERIAL         // telnet ascii input - cvs format [band],[freq]\n
-#define ICOM_CIV             // read frequency from CIV
-// #define MULTI_OUTPUT_BY_BCD  // manual switch between four output on same band by BCD input
-                                // - INPUT_BCD input must be disable
-                                // - BCD output will be disble
-                                // - it must always be select (grounded) one of BCD input
-//=====[ Outputs ]============================================================================================
-//   If enable:
-// - baudrate is same as selected Inputs
-// - Inputs work only in 'sniff mode'
-// - for operation must disable REQUEST
-//
-#define ICOM_CIV_OUT       // send frequency to CIV ** you must set TRX CIV_ADRESS **
-// #define SERIAL_echo        // Feedback on serial line in same baudrate, CVS format <[band],[freq]>\n
-// #define PTT_BY_BAND        // distributed PTT dependency to band (disable band decoder outputs) TNX Tim W4YN for idea
-// #define PWM_OUT               // PWM on D5 with rc filter (10k/10u) represent analog output J2.12
-
-//=====[ Hardware ]=============================================================================================
-
-//=====[ Settings ]===========================================================================================
-#define BANDSET
-#define SERBAUD     115200     // [baud] Serial port in/out baudrate
-#define WATCHDOG        20     // [sec] determines the time, after which the all relay OFF, if missed next input data - uncomment for the enabled
-#define REQUEST        500    // [ms] use TXD output for sending frequency request
-#define CIV_ADRESS    0xAC    // CIV input HEX Icom adress (0x is prefix)
-#define CIV_ADR_OUT   0xAC    // CIV output HEX Icom adress (0x is prefix)
-// #define DISABLE_DIVIDER    // for lowest voltage D-SUB pin 13 inputs up to 5V only - need open JP9
-//#define DEBUG              // enable some debugging
-//=====[ FREQUENCY RULES ]===========================================================================================
-
-const uint64_t Freq2Band[18][2] = {/*
-Freq Hz from       to   Band number
-*/   {1810000,   2000000},  // #1 [160m]
-     {3500000,   3800000},  // #2  [80m]
-     {5298000,   5403000},  // #3  [60m]
-     {7000000,   7200000},  // #4  [40m]
-    {10100000,  10150000},  // #5  [30m]
-    {14000000,  14350000},  // #6  [20m]
-    {18068000,  18168000},  // #7  [17m]
-    {21000000,  21450000},  // #8  [15m]
-    {24890000,  24990000},  // #9  [12m]
-    {28000000,  29700000},  // #10  [10m]
-    {50000000,  52000000},  // #11  [6m]
-    {70000000,  72000000},  // #12  [4m]
-   {144000000, 148000000},  // #13  [2m]
-   {430000000, 450000000},  // #14  [70cm]
-   {1240000000UL, 1300000000UL},  // #15  [23cm]
-   {2300000000UL, 2450000000UL},  // #16  [13cm]
-   //{3300000000, 3500000000},  // #17  [9cm]
-   {5650000000UL, 5999000000UL},  // #17  [6cm]
-   {10000000000UL, 10200000000UL}  // #18  [3cm]
-};
-
-//=====[ Sets band -->  to output in MATRIX table ]===========================================================
-
-        const byte matrix[17][40] = { /* band out
-
-        If enable #define MULTI_OUTPUT_BY_BCD
-        you can select outputs manually to ground one from BCD inputs
-        to select between four output on same band
-        represent by bit in this table
-        0x01 = B00000001 = bit 1
-        0x02 = B00000010 = bit 2
-        0x04 = B00000100 = bit 3
-        0x08 = B00001000 = bit 4
-        For example record
-        Band 1 -->  {      0x01,       0x02,       0x04,  0,       0x08,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 },
-        is the same as record
-        Band 1 -->  { B00000001,  B00000010,  B00000100,  0,  B00001000,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 },
-
-        0x0F = this output enable for any BCD input (enable all bit)
-
-        Band 0 --> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /* first eight shift register board
-\       Band 1 --> */ { 0x0F,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
- \      Band 2 --> */ { 0,  0x0F,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-  \     Band 3 --> */ { 0,  0,  0x0F,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-   \    Band 4 --> */ { 0,  0,  0,  0x0F,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-    \   Band 5 --> */ { 0,  0,  0,  0,  0x0F,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-     \  Band 6 --> */ { 0,  0,  0,  0,  0,  0x0F,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-IN    ) Band 7 --> */ { 0,  0,  0,  0,  0,  0,  0x0F,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-     /  Band 8 --> */ { 0,  0,  0,  0,  0,  0,  0,  0x0F,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-
-    /   Band 9 --> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0x0F,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /* second eight shift register board
-   /    Band 10 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0x0F,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /* (optional)
-  /     Band 11 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0x0F,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
- /      Band 12 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0x0F,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-/       Band 13 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0x0F,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-        Band 14 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0x0F,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-        Band 15 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0x0F,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-        Band 16 -> */ { 0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0x0F,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0 }, /*
-                        |   |   |   |   |   |   |   |     |   |   |   |   |   |   |   |
-                        V   V   V   V   V   V   V   V     V   V   V   V   V   V   V   V
-                     ----------------------------------  ---------------------------------
-                     |  1   2   3   4   5   6   7   8     9  10  11  12  13  14  15  16  |
-                     ----------------------------------  ---------------------------------
-                                                   OUTPUTS
-                                    (for second eight need aditional board)*/
-        };
-        const int NumberOfBoards = 1;    // number of eight byte shift register 0-x
-
-//=====[ BCD OUT ]===========================================================================================
-
-        const boolean BCDmatrixOUT[4][16] = { /*
-        --------------------------------------------------------------------
-        Band # to output relay   0   1   2   3   4   5   6   7   8   9  10
-        (Yaesu BCD)                 160 80  40  30  20  17  15  12  10  6m
-        --------------------------------------------------------------------
-                                 |   |   |   |   |   |   |   |   |   |   |
-                                 V   V   V   V   V   V   V   V   V   V   V
-                            */ { 0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0, 1, 0, 1, 0, 1 }, /* --> DB25 Pin 11
-                            */ { 0,  0,  1,  1,  0,  0,  1,  1,  0,  0,  1, 1, 0, 0, 1, 1 }, /* --> DB25 Pin 24
-                            */ { 0,  0,  0,  0,  1,  1,  1,  1,  0,  0,  0, 0, 1, 1, 1, 1 }, /* --> DB25 Pin 12
-                            */ { 0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1, 1, 1, 1, 1, 1 }, /* --> DB25 Pin 25
-        */};
-//=====[ PWM OUT ]===========================================================================================
-#if defined(PWM_OUT)
-  const uint32_t PwmByBand[17] = {/*
-  PWM 0-255
-  */ 0,    // #0  OUT of band
-     11,   // #1  [160m] 0,23V
-     24,   // #2  [80m] 0,46V
-     36,   // #3  [60m] 0,69V
-     49,   // #4  [40m] 0,92V
-     62,   // #5  [30m] 1,15V
-     74,   // #6  [20m] 1,38V
-     87,   // #7  [17m] 1,61V
-     99,  // #8  [15m] 1,84V
-     111,  // #9  [12m] 2,07V
-     124,  // #10 [10m] 2,3V
-     137,  // #11 [6m]  2,53V
-     180,  // #12 [4m]
-     195,  // #13 [2m]
-     210,  // #14 [70cm]
-     225,  // #15 [23cm]
-     240,  // #16 [13cm]
-  };
-#endif
-//============================================================================================================
-
-
-//byte ShiftByte[NumberOfBoards];
-byte ShiftByte[5];
-
-// int SelectOut = 0;
-// int x;
-  uint32_t RequestTimeout[2]={0,
-    #if defined(REQUEST)
-      REQUEST
-    #else
-      0
-    #endif
-  };
-
-int watchdog2 = 1000;     // REQUEST refresh time [ms]
-int previous2;
-int timeout2;
-
-#if defined(WATCHDOG)
-    int previous;
-    int timeout;
-    uint32_t WatchdogTimeout[2] = {0, WATCHDOG*1000};  // {-WATCHDOG*1000, WATCHDOG*1000};
-#endif
-#if defined(ICOM_ACC)
-    float AccVoltage = 0;
-    float prevAccVoltage=0;
-    int band = 0;
-    int counter = 0;
-#endif
-
 // ************************************************* Setup *****************************************
 //
 // *************************************************************************************************
@@ -519,7 +268,6 @@ time_t prevDisplay = 0; // When the digital clock was displayed
 unsigned long time_current_baseloop;       // temporary time of the baseloop entry for calculations
 unsigned long time_last_baseloop;          // will be updated at the end of every baseloop run
 #define BASELOOP_TICK 10 
-
 
 void setup()
 {
@@ -977,7 +725,7 @@ void SendCIVmsg(void)
 {
     uint8_t str[20] = "\xFE\xFE\xE0\x05\x00\x00\x20\x44\x01\xFD\x00";
     if (CAT_Poll.check() == 1) {
-    CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_SEND, str, CIV_wChk);
+    CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_MOD1_SEND, str, CIV_wChk);
     //CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
     PC_Debug_port.print("retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL.retVal]);
     
@@ -1042,29 +790,6 @@ unsigned int hexToDec(String hexString) {
 }
 //---------------------------------------------------------------------------------------------------------
 
-
-void FreqToBandRules(uint64_t freq)
-{
-return;
-         if (freq >=Freq2Band[0][0] && freq <=Freq2Band[0][1] )  {BAND=1;}  // 160m
-    else if (freq >=Freq2Band[1][0] && freq <=Freq2Band[1][1] )  {BAND=2;}  //  80m
-    else if (freq >=Freq2Band[2][0] && freq <=Freq2Band[2][1] )  {BAND=3;}  //  40m
-    else if (freq >=Freq2Band[3][0] && freq <=Freq2Band[3][1] )  {BAND=4;}  //  30m
-    else if (freq >=Freq2Band[4][0] && freq <=Freq2Band[4][1] )  {BAND=5;}  //  20m
-    else if (freq >=Freq2Band[5][0] && freq <=Freq2Band[5][1] )  {BAND=6;}  //  17m
-    else if (freq >=Freq2Band[6][0] && freq <=Freq2Band[6][1] )  {BAND=7;}  //  15m
-    else if (freq >=Freq2Band[7][0] && freq <=Freq2Band[7][1] )  {BAND=8;}  //  12m
-    else if (freq >=Freq2Band[8][0] && freq <=Freq2Band[8][1] )  {BAND=9;}  //  10m
-    else if (freq >=Freq2Band[9][0] && freq <=Freq2Band[9][1] ) {BAND=10;}  //   6m
-    else if (freq >=Freq2Band[10][0] && freq <=Freq2Band[10][1] ) {BAND=11;}  // 2m
-    else if (freq >=Freq2Band[11][0] && freq <=Freq2Band[11][1] ) {BAND=12;}  // 70cm
-    else if (freq >=Freq2Band[12][0] && freq <=Freq2Band[12][1] ) {BAND=13;}  // 1296
-    else if (freq >=Freq2Band[13][0] && freq <=Freq2Band[13][1] ) {BAND=14;}  // 2.3G
-    else if (freq >=Freq2Band[14][0] && freq <=Freq2Band[14][1] ) {BAND=15;}  // 5.7G
-    else if (freq >=Freq2Band[15][0] && freq <=Freq2Band[15][1] ) {BAND=16;}  // 10G
-    else {BAND=0;}   // out of range
-}
-
 bool CompareStrings(const char *sz1, const char *sz2) {
   while (*sz2 != 0) {
     if (toupper(*sz1) != toupper(*sz2)) 
@@ -1075,141 +800,7 @@ bool CompareStrings(const char *sz1, const char *sz2) {
   return true; // end of string so show as match
 }
 
-/*
-char * convert_freq_to_Str(uint32_t freq)
-{
-  //sprintf(freq_str, "%lu", freq);
-  //send_fixed_cmd_to_RSHFIQ(freq_str);
-  //return freq_str;
-}
-*/
-
-#ifdef BANDSET
-void bandSET() {                                               // set outputs by BAND variable
-
-  if(BAND==0 && previousBAND != 0){    // deactivate PTT
-    //digitalWrite(PttOffPin, HIGH);
-    PTT = true;
-    #if defined(LCD)
-      LcdNeedRefresh = true;
-    #endif
-  }else if(BAND!=0 && previousBAND == 0){    // deactivate PTT
-    //digitalWrite(PttOffPin, LOW);
-  }
-
-  #if !defined(PTT_BY_BAND)
-  if((PTT==false && previousBAND != 0 ) || (PTT==true && previousBAND == 0)){
-  #endif
-    for (int i = 0; i < NumberOfBoards; i++) {
-      ShiftByte[i] = B00000000;
-    }
-
-    #if defined(MULTI_OUTPUT_BY_BCD)
-      for (int i = 0; i < 17; i++) {   // outputs 1-8
-        for (int y = 0; y < 4; y++) { // bcd bit
-          if(bitRead(SelectBank,y)==1 && bitRead(matrix[BAND][i],y)==1){
-            if(i<8){
-              bitSet(ShiftByte[0], i);
-            }else{
-              bitSet(ShiftByte[1], i-8);
-            }
-          }
-        }
-      }
-    #else
-      for (int i = 0; i < 8; i++) {   // outputs 1-8
-        if(matrix[BAND][i]>0){
-          ShiftByte[0] = ShiftByte[0] | (1<<i);
-        }
-      }
-      for (int i = 8; i < 16; i++) {   // outputs 9-16
-        if(matrix[BAND][i]>0){
-          ShiftByte[1] = ShiftByte[1] | (1<<(i-8));
-        }
-      }
-      for (int i = 16; i < 24; i++) {   // outputs 17-24
-        if(matrix[BAND][i]>0){
-          ShiftByte[2] = ShiftByte[2] | (1<<(i-16));
-        }
-      }
-      for (int i = 24; i < 32; i++) {   // outputs 25-32
-        if(matrix[BAND][i]>0){
-          ShiftByte[3] = ShiftByte[3] | (1<<(i-24));
-        }
-      }
-      for (int i = 32; i < 40; i++) {   // outputs 33-40
-        if(matrix[BAND][i]>0){
-          ShiftByte[4] = ShiftByte[4] | (1<<(i-32));
-        }
-      }
-    #endif
-
-    //digitalWrite(ShiftOutLatchPin, LOW);    // ready for receive data
-      for (int i = NumberOfBoards; i >0; i--) {   // outputs 9-16
-        //shiftOut(ShiftOutDataPin, ShiftOutClockPin, LSBFIRST, ShiftByte[i-1]);
-      }
-    ////////////////////////////////////////////////         digitalWrite(ShiftOutLatchPin, HIGH);    // switch to output pin
-
-    #if !defined(INPUT_BCD) && !defined(MULTI_OUTPUT_BY_BCD) && !defined(PWM_OUT)
-        //bcdOut();
-    #endif
-
-    #if defined(EthModule)
-      TxUDP(ThisDevice, RemoteDevice, ShiftByte[1], ShiftByte[0], 0x00);
-    #endif
-
-    #if defined(LCD)
-      LcdNeedRefresh = true;
-    #endif
-  #if !defined(PTT_BY_BAND)
-  }
-  #endif
-
-  #if defined(PWM_OUT)
-    analogWrite(PwmOutPin, PwmByBand[BAND]);
-  #endif
-
-  // #if defined(EthModule)
-  //   if(DetectedRemoteSw[NET_ID][4]==0 || RemoteSwLatencyAnsw==0){
-  //     //  && millis() < RemoteSwLatency[0]+RemoteSwLatency[1]*5) ){
-  //     digitalWrite(PttOffPin, HIGH);
-  //     #if defined(UdpBroadcastDebug_debug)
-  //       TxBroadcastUdp("BandSet-" + String(DetectedRemoteSw[NET_ID][4]) + "-" + String(RemoteSwLatencyAnsw) );
-  //     #endif
-  //     PTT = true;
-  //     #if defined(LCD)
-  //     LcdNeedRefresh = true;
-  //     #endif
-  //   }
-  // #endif
-  #if defined(EthModule_XXX)
-    #if defined(BcdIpRelay)
-      TxUDP(ThisDevice, RemoteDevice, BAND, 0x00, 0x00);
-    #else
-      byte A = 0x00;
-      for (int i = 0; i < 8; i++) {   // outputs 1-8
-        if(matrix[BAND][i]==1){
-          A = A | (1<<i); // set n-th bit
-        }
-      }
-      byte B = 0x00;
-      for (int i = 8; i < 16; i++) {   // outputs 8-16
-        if(matrix[BAND][i]==1){
-          B = B | (1<<i-8); // set n-th bit
-        }
-      }
-      TxUDP(ThisDevice, RemoteDevice, A, B, 0x00);
-    #endif
-  #endif
-
-  previousBAND = BAND;
-  #if defined(WATCHDOG)
-    WatchdogTimeout[0] = millis();                   // set time mark
-  #endif
-}
-#endif
 //----------
-
 #ifndef USE_RA8875
     int16_t _activeWindowXL = 0;
     int16_t _activeWindowXR = SCREEN_WIDTH;

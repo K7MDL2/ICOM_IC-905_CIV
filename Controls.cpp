@@ -5,19 +5,6 @@
 #include "RadioConfig.h"
 #include "ICOM_IC-905_CIV.h"
 
-#ifdef USE_RS_HFIQ
-    // init the RS-HFIQ library
-    extern SDR_RS_HFIQ RS_HFIQ;
-    extern void send_fixed_cmd_to_RSHFIQ(const char* str);
-#endif
-
-// Using the SV1AFN Band Pass Filter board with modified I2C library for Premp, Attenuator, and for 10 HF bands of BPFs
-// #include "SVN1AFN_BandpassFilters.h>""
-#ifdef SV1AFN_BPF
-    #include "SVN1AFN_BandpassFilters.h"
-    extern SVN1AFN_BandpassFilters bpf;
-#endif
-
 #ifdef USE_RA8875
     extern RA8875 tft;
 #else
@@ -36,41 +23,26 @@ extern struct Label labels[];
 extern struct Filter_Settings filter[];
 extern struct AGC agc_set[];
 extern struct NB nb[];
-extern struct Spectrum_Parms Sp_Parms_Def[];
 extern struct Zoom_Lvl zoom[];
 extern struct EncoderList encoder_list[];
 extern struct TuneSteps tstep[];
-extern struct Transverter xvtr[];
 extern uint8_t user_Profile;
 extern Metro popup_timer; // used to check for popup screen request
 extern Metro TX_Timeout;  // RunawayTX timeout
-//extern AudioControlSGTL5000 codec1;
-//extern radioNoiseBlanker_F32 NoiseBlanker;
-//extern AudioEffectCompressor2_F32 compressor1; // Audio Compressor
-//extern AudioEffectCompressor2_F32 compressor2; // Audio Compressor
 extern uint8_t popup;
-//extern void RampVolume(float vol, int16_t rampType);
 extern volatile int64_t Freq_Peak;
 extern void set_MF_Service(uint8_t client_name);
 extern void unset_MF_Service(uint8_t client_name);
 extern uint8_t MF_client;  // Flag for current owner of MF knob services
-extern float fft_bin_size; // = sample_rate_Hz/(FFT_SIZE*2) -  Size of FFT bin in Hz
 extern void touchBeep(bool enable);
 extern bool MeterInUse; // S-meter flag to block updates while the MF knob has control
 extern Metro MF_Timeout;
 extern bool MF_default_is_active;
 extern uint8_t default_MF_slot;
-//extern void TX_RX_Switch(bool TX, uint8_t mode_sel, bool b_Mic_On, bool b_USBIn_On, bool b_ToneA, bool b_ToneB, float TestTone_Vol);
 extern int32_t ModeOffset;
-//extern AudioMixer4_F32 I_Switch;
-//extern AudioMixer4_F32 Q_Switch;
-//extern AudioLMSDenoiseNotch_F32 LMS_Notch;
-//extern bool TwoToneTest;
 extern uint16_t fft_size;
 extern int16_t fft_bins;
-//extern void Change_FFT_Size(uint16_t new_size, float new_sample_rate_Hz);
-extern float zoom_in_sample_rate_Hz;
-extern float sample_rate_Hz;
+
 #ifdef USE_FREQ_SHIFTER
     extern AudioEffectFreqShiftFD_OA_F32 FFT_SHIFT_I;
     extern AudioEffectFreqShiftFD_OA_F32 FFT_SHIFT_Q;
@@ -89,8 +61,6 @@ extern int16_t xit_offset_last;   // global RIT offset value in Hz.
 extern void update_icon_outline(void);
 extern void ringMeter(int val, int minV, int maxV, int16_t x, int16_t y, uint16_t r, const char* units, uint16_t colorScheme, uint16_t backSegColor, int16_t angle, uint8_t inc);
 
-void Set_Spectrum_Scale(int8_t zoom_dir);
-void Set_Spectrum_RefLvl(int8_t zoom_dir);
 void changeBands(int8_t direction);
 void pop_win_up(uint8_t win_num);
 void pop_win_down(uint8_t win_num);
@@ -142,51 +112,7 @@ void setPAN(int8_t toggle);
 void digital_step_attenuator_PE4302(int16_t _atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 void setEncoderMode(uint8_t role);
 
-#ifndef BYPASS_SPECTRUM_MODULE
-// Use gestures (pinch) to adjust the the vertical scaling.  This affects both watefall and spectrum.  YMMV :-)
-COLD void Set_Spectrum_Scale(int8_t zoom_dir)
-{
-    // DPRINTLN(zoom_dir);
-    // extern struct Spectrum_Parms Sp_Parms_Def[];
-    // extern Spectrum_RA887x spectrum_RA887x;    // Spectrum Display Libary
-    if (Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale > 2.0)
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale = 0.5;
-    if (Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale < 0.5)
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale = 2.0;
-    if (zoom_dir == 1)
-    {
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale += 0.1;
-        // DPRINTLN("ZOOM IN");
-    }
-    else
-    {
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale -= 0.1;
-        // DPRINTLN("ZOOM OUT");
-    }
-    // DPRINTLN(Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_scale);
-}
 
-// Use gestures to raise and lower the spectrum reference level relative to the bottom of the window (noise floor)
-COLD void Set_Spectrum_RefLvl(int8_t zoom_dir)
-{
-    // DPRINTLN(zoom_dir);
-
-    if (zoom_dir == 1)
-    {
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor -= 1;
-        // DPRINTLNF("RefLvl=UP");
-    }
-    else
-    {
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor += 1;
-        // DPRINTLNF("RefLvl=DOWN");
-    }
-    if (Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor < -400)
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor = -400;
-    if (Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor > 400)
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor = 400;
-}
-#endif
 //
 //----------------------------------- Skip to Ham Bands only ---------------------------------
 //
@@ -533,14 +459,9 @@ COLD void Variable_Filter(int8_t dir)
         //filterBandwidth               = var_bw;
         bandmem[curr_band].var_filter = (uint16_t)var_bw; // Store our new filter width
 
-        //AudioNoInterrupts();
-        //Amp1_L.setGain_dB(AUDIOBOOST); // Adjustable fixed output boost in dB.
-        //Amp1_R.setGain_dB(AUDIOBOOST);
-        //AudioInterrupts();
-
         // DPRINTF("Set Variable Filter to "); DPRINTLN(bandmem[curr_band].var_filter);
     }
-    // ToDo: Se tthe butomn filter index to closest value of the curent variable fil;ter to permit mixed operation of encoder and button
+    // ToDo: Set the button filter index to closest value of the current variable filter to permit mixed operation of encoder and button
 
     //SetFilter();
     //displayVarFilter();
@@ -654,19 +575,14 @@ COLD void Mute()
 COLD void Menu()
 {
     pop_win_up(SPECTUNE_BTN);
-#ifndef BYPASS_SPECTRUM_MODULE
-    Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_colortemp += 10;
-    if (Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_colortemp > 10000)
-        Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_colortemp = 1;
-#endif
+
     // tft.fillRect(t_ptr->bx, t_ptr->by, t_ptr->bw, t_ptr->bh, RA8875_BLACK);
     tft.setFont(Arial_24);
     tft.setTextColor(BLUE);
     tft.setCursor(CENTER, CENTER, true);
     tft.print(F("this is a future keyboard"));
     delay(1000);
-    // DPRINT("spectrum_wf_colortemp = ");
-    // DPRINTLN(Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_wf_colortemp);
+
     pop_win_down(SPECTUNE_BTN); // remove window, restore old screen info, clear popup flag and timer
     displayMenu();
     DPRINTLN("Menu Pressed");
@@ -763,27 +679,6 @@ COLD void setAtten(int8_t toggle)
 
     // Set the attenuation level from the value in the database
     Atten(0);  // 0 = no change to set attenuator level to value in database for this band
-
-#ifdef SV1AFN_BPF
-    // if (bandmem[curr_band].attenuator == ATTEN_OFF)
-    // Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor += bandmem[curr_band].attenuator_dB;  // reset back to normal
-    // else
-    // Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor -= bandmem[curr_band].attenuator_dB;  // raise floor up due to reduced signal levels coming in
-
-    codec1.muteHeadphone();
-    //codec1.lineInLevel(0); // Audio out to Line-Out and TX board
-    delay(50);
-    //RampVolume(0.0, 1); //  0 = loud pop due to instant change || 1="Normal Ramp" // graceful transition between volume levels || 2= "Linear Ramp"
-    if (bandmem[curr_band].attenuator_byp)
-        bpf.setAttenuator(true); // Turn attenuator relay and status icon on or off
-    else
-        bpf.setAttenuator(false); // Turn attenuator relay and status icon on or off
-    //RampVolume(user_settings[user_Profile].afGain, 1); //     0 ="No Ramp (instant)"  // loud pop due to instant change || 1="Normal Ramp" // graceful transition between volume levels || 2= "Linear Ramp"
-    //RampVolume(0.01f, 0);   // Instant off.  0 to 1.0f for full scale.
-    delay(50);
-    codec1.unmuteHeadphone(); // Audio out to Line-Out and TX board
-    AFgain(0); //   Reset afGain to last used to bypass thumps
-#endif
 
     displayAttn();
 
@@ -1313,10 +1208,7 @@ COLD void AFgain(int8_t delta)
         //   Temp mic/lineout level control until a real control is created for these
         _afLevel                                   = 100;                  // force to 100%
         user_settings[user_Profile].mic_Gain_level = _afLevel;             // 0 to 100 mic gain range
-        //codec1.micGain(user_settings[user_Profile].mic_Gain_level * 0.63); // adjust for 0 to 63dB
-        // codec1.micGain(63);  // adjust for 0 to 63dB
-        //codec1.lineOutLevel(user_settings[user_Profile].lineOut_TX * _afLevel / 100); // skip when in TX to act as Mic Level Adjust control
-        // codec1.lineOutLevel(14); // skip when in TX to act as Mic Level Adjust control
+
         DPRINT("Mic Gain (0-63dB)= ");
         DPRINTLN(_afLevel * 0.63);
         DPRINT("Power Out(0-100%)= ");
@@ -1395,13 +1287,6 @@ COLD void RFgain(int8_t delta)
 
     // Store new value as 0 to 100%
     user_settings[user_Profile].rfGain = _rfLevel; // 0 to 100 range, ,linear
-
-    // LineIn is 0 to 15 with 15 being the most sensitive
-    //codec1.lineInLevel(user_settings[user_Profile].lineIn_level * user_settings[user_Profile].rfGain / 100);
-
-    // Attennuating a gain stage is fast and helps give more RFgain effectivness
-    //I_Switch.gain(0, (float)_rfLevel / 100); //  1 is RX, 0 is TX
-    //Q_Switch.gain(0, (float)_rfLevel / 100); //  1 is RX, 0 is TX
 
     // DPRINT("CodecLine IN level set to ");
     // DPRINTLN(user_settings[user_Profile].lineIn_level * user_settings[user_Profile].rfGain/100);
@@ -1621,21 +1506,9 @@ COLD void NBLevel(int8_t delta)
 
     if (user_settings[user_Profile].nb_en == ON) // Adjust the value if on
     {
-        //NoiseBlanker.showError(1);
-        //NoiseBlanker.useTwoChannel(true); // true enables a path through the "I"  or left side for I and Q
-        //NoiseBlanker.enable(true);        // turn on NB for I
-        // void setNoiseBlanker(float32_t _threshold, uint16_t _nAnticipation, uint16_t _nDecay)
-        //NoiseBlanker.setNoiseBlanker(nb[user_settings[user_Profile].nb_level].nb_threshold,
-        //                             nb[user_settings[user_Profile].nb_level].nb_nAnticipation,
-        //                             nb[user_settings[user_Profile].nb_level].nb_decay); // for I
-        // threshold recommended to be between 1.5 and 20, closer to 3 maybe best.
-        // nAnticipation is 1 to 125
-        // Decay is 1 to 10.
     }
     else // NB is disabled so bypass
     {
-        //NoiseBlanker.enable(false); //  NB block is bypassed
-        // DPRINTF("NB Disabled");
     }
 
     // DPRINTF("NB level set to  "); DPRINTLN(_nbLevel);
@@ -1648,14 +1521,10 @@ COLD void setNR()
     if (user_settings[user_Profile].nr_en > NROFF)
     {
         user_settings[user_Profile].nr_en = NROFF;
-        //LMS_Notch.enable(false);
     }
     else if (user_settings[user_Profile].nr_en == NROFF)
     {
         user_settings[user_Profile].nr_en = NR1;
-        //LMS_Notch.enable(true);
-        //DPRINTLN(LMS_Notch.initializeLMS(1, 32, 4)); // <== Modify to suit  2=Notch 1=Denoise
-        //LMS_Notch.setParameters(0.05f, 0.999f);      // (float _beta, float _decay);
     }
     displayNR();
     // DPRINTF("Set NR to "); DPRINTLN(user_settings[user_Profile].nr_en);
@@ -1847,35 +1716,6 @@ COLD void TouchTune(int16_t touch_Freq)
 {
 
     if (popup == 1) return; // skip if menu window is active
-
-#ifndef BYPASS_SPECTRUM_MODULE
-    int64_t pk;
-
-    pk = pan * (fft_size - SCREEN_WIDTH);                                                   // pan offset in fft_bin count
-    touch_Freq -= Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_width / 2 - pk; // adjust coordinate relative to center accounting for pan offset
-    int64_t _newfreq = touch_Freq * fft_bin_size * 2;                                       // convert touch X coordinate to a frequency and jump to it.
-    // We have our new target frequency from touch
-    // DPRINTF("\npan offset (bins from center)     ="); DPRINTLN(pk);
-    // DPRINTF("touch_Freq (bins from center)     ="); DPRINTLN(touch_Freq);
-    // DPRINTF("Touch target change in Hz         ="); DPRINTLN(_newfreq);
-    // DPRINTF("New target touch VFO (Hz)         ="); DPRINTLN(formatVFO(VFOA+_newfreq));
-    // Suggested frequency from the Peak Frequency function in the spectrum library - may not be the one we want! It is just the strongest.
-    // DPRINTF("\nFreq_Peak (Hz)                  ="); DPRINTLN(formatVFO(Freq_Peak));
-    // DPRINTF("Target VFOA - VFO_peak (Hz)       ="); DPRINTLN(VFOA+_newfreq-Freq_Peak);
-
-    DPRINT(F("Touch-Tune frequency is "));
-    VFOA += _newfreq;
-
-    // If the Peak happens to be close to the touch target frequency then we can use that to fine tune the new VFO
-    if (abs(VFOA - Freq_Peak < 1000))
-    {
-        if (bandmem[curr_band].mode_A == CW || bandmem[curr_band].mode_A == CW_REV)
-            VFOA = Freq_Peak - ModeOffset; // user_settings[user_Profile].pitch;
-        else
-            VFOA = Freq_Peak; // bin number from spectrum
-    }
-    DPRINTLN(formatVFO(VFOA));
-#endif
     selectFrequency(0);
     displayFreq();
 }
@@ -1909,33 +1749,9 @@ COLD void selectAgc(uint8_t andx)
     bandmem[curr_band].agc_mode = andx;
 
     if (andx == AGC_OFF)
-    {
-        /*
-        codec1.autoVolumeControl(
-            pAGC->agc_maxGain,
-            pAGC->agc_response,
-            pAGC->agc_hardlimit,
-            pAGC->agc_threshold,
-            pAGC->agc_attack,
-            pAGC->agc_decay);
-        codec1.autoVolumeDisable();
-        codec1.audioProcessorDisable();
-        */
-    }
+    {    }
     else
-    {
-        /*
-        codec1.autoVolumeControl(
-            pAGC->agc_maxGain,
-            pAGC->agc_response,
-            pAGC->agc_hardlimit,
-            pAGC->agc_threshold,
-            pAGC->agc_attack,
-            pAGC->agc_decay);
-        codec1.audioPostProcessorEnable();
-        codec1.autoVolumeEnable();
-        */
-    }
+    {    }
     // displayAgc();
 }
 
