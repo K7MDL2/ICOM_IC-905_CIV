@@ -16,7 +16,7 @@
 //      2 = CAT (passed through to PC as well as shared by this controller - both bidirectional - some conflict management required),
 //      3 = GPS data (passed through to PC)
 //
-//  Includes modified CI-V library code from CIVMasterLib  https://github.com/WillyIoBrok/CIVmasterLib
+//  Includes modified CI-V library code forked to my GitHub from CIVMasterLib  https://github.com/K7MDL2/CIVmasterLib 
 //    Modifed to include IC-905 support for 5GHz and 10GHz and higher bands which require uint64_t size frequency variable and 12 bytes in the frequency strings for band over 10.0GHz.
 //    Still uses the 10bytes for bands < 10.0GHz.
 //
