@@ -16,13 +16,17 @@
 #include <ICradio.h>                    // this would include CIVcmds.h and CIVmaster.h, if not included before !
 
 void getradioInfo(void);
-void check_CIV(void);
-void FrequencyRequest(void);
+uint8_t check_CIV(uint32_t time_current_baseloop);
+uint64_t FrequencyRequest(void);
 void RcvCIVmsg(void);
 void SendCIVmsg(void);
-void civ_setup(void);
+void civ_905_setup(void);
 void pass_CAT_msgs_to_RADIO(void);
 //void pass_CAT_msg_to_PC(void);
+void show_CIV_log(void);
+void civ_setup(uint32_t currentTime);
+radioModMode_t getModMode(void);
+uint8_t getByteResponse(const uint8_t m_Counter, const uint8_t offset, const uint8_t buffer[]);
 
 #ifdef GPS
   void pass_GPS(void);
