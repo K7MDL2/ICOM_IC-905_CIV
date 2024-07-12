@@ -83,3 +83,7 @@ On my GitHub is a fork of the CIVMasterLib repo @ https://github.com/K7MDL2/CIVm
 7/8/2024
 
 Made several fixes.  Can now bidirectionally tune from either end on all bands including 10Ghz, followsws the configured band map.  The SD card config read at startup is bypassed until dev changes are stabilized more.  Next up are getting mode and filter to align.  There is a long list of settings and status stuff that I could sync with the radio (both directions) given time to code it up, mostly now a matter of priority order vs time vs usefulness.
+
+7/11/2024
+
+Moved CIV function calls into CIV.cpp/CIV.h.  Can exttrnd comms wit hte radio in the CIV file and unclutter the main .ino file some.
