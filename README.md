@@ -86,4 +86,4 @@ Made several fixes.  Can now bidirectionally tune from either end on all bands i
 
 7/11/2024
 
-Moved CIV function calls into CIV.cpp/CIV.h.  Can exttrnd comms wit hte radio in the CIV file and unclutter the main .ino file some.
+Moved CIV function calls into CIV.cpp/CIV.h.  Can extend comms with the radio in the CIV file and unclutter the main .ino file some.
