@@ -1955,3 +1955,17 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
     //#endif
     return 0; // 0 means frequency was not found in the table
 }
+
+COLD void selectMode(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
+{
+  //DPRINTLN(mndx);
+  for (int i=0; i< MODES_NUM; i++)
+  { 
+    if (mndx == modeList[i].mode_num)
+    {
+	    DPRINT("Set mode to "); DPRINTLN(modeList[i].mode_label);  	
+      bandmem[curr_band].mode_A = i; // get current mod
+    }
+  }
+ 	displayMode();
+}
