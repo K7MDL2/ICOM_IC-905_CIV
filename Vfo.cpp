@@ -42,7 +42,7 @@ COLD void SetFreq(uint64_t Freq)
         "CIV_NO_MSG"
     };
 
-    formatFreq(Freq);  // Convert
+    formatFreq(Freq);  // Convert to BCD string
     //PC_Debug_port.printf("VFO: hex in SetFreq: %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
     CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, CIV_C_F1_SEND, vfo_dec, CIV_wFast);
     //PC_Debug_port.print("VFO: retVal of writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL_vfo.retVal]);

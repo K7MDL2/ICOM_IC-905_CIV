@@ -69,7 +69,6 @@
 #include "Vfo.h"
 #include "Display.h"
 #include "Tuner.h"
-#include "Mode.h"
 //#include "Smeter.h"
 #include "Controls.h"
 #include "UserInput.h"          // include after Spectrum_RA8875.h and Display.h

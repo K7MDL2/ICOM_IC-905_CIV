@@ -186,7 +186,7 @@ Metro TX_Timeout           = Metro(180000); // 180000 is 3 minutes for RunawayTX
 Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT comms
 Metro CAT_Poll             = Metro(1000);  // Throttle the servicing for CAT comms
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
-Metro CAT_Freq_Check       = Metro(500);   // Clear the CIV log buffer
+Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
 
 uint64_t    xvtr_offset             = 0;
 int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
@@ -217,8 +217,9 @@ uint8_t     display_state;   // something to hold the button state for the displ
 bool        touchBeep_flag          = false;
 uint8_t     popup       = 0;   // experimental flag for pop up windows
 static uint32_t delta = 0;
-
 uint8_t lpCnt = 0;
+uint8_t     radio_mode = 0;         // mode from radio messages
+uint8_t     radio_filter = 0;       // filter from radio messages
 
 // ************************************************* Setup *****************************************
 //
@@ -379,7 +380,7 @@ void setup()
     tft.setTextColor(WHITE);
     tft.print("Initializing USB Host port to Radio - Cable Connected?");
     
-    civ_setup();
+    civ_905_setup();   
     
     counter = 0;
     //disp_Menu();
@@ -436,15 +437,7 @@ void setup()
         xvtr_offset = 0;
     DPRINTF("Setup: xvr_offset = "); DPRINTLN(xvtr_offset);
 
-    #if defined USE_RS_HFIQ // if RS-HFIQ is used, then send the active VFO frequency and receive the (possibly) updated VFO
-        DPRINTLNF("Initializing RS-HFIQ Radio via USB Host port");
-        #ifndef NO_RSHFIQ_BLOCKING
-            RS_HFIQ.setup_RSHFIQ(1, VFOA - xvtr_offset); // 0 is non blocking wait, 1 is blocking wait.  Pass active VFO frequency
-        #else
-            RS_HFIQ.setup_RSHFIQ(0, VFOA - xvtr_offset); // 0 is non blocking wait, 1 is blocking wait.  Pass active VFO frequency
-        #endif
-        DPRINTF("Setup: Post RS-HFIQ VFOA = "); DPRINTLN(VFOA);
-    #elif defined USE_CAT_SER
+    #if defined USE_CAT_SER
         //CAT_Serial.setup_CAT_Serial();   
         //delay(1000); // Give time to see the slash screen
     #endif
@@ -497,25 +490,48 @@ void loop()
             tft.print(jhElapsed / 10);
         }
     #endif
-
-  // Check on any CIV activity
-    time_current_baseloop = millis();
-    //if ((time_current_baseloop - time_last_baseloop) > BASELOOP_TICK) {
-        // ----------------------------------  check, whether there is something new from the radio
-        //if (time_current_baseloop>t_RadioCheck) 
-    check_CIV();
-    time_last_baseloop = time_current_baseloop;
-    
+  
     #ifdef GPS
         pass_GPS();  // read USB serial ch 'B' for GPS NMEA data strings
         // ToDo: extract grid and time info and display
     #endif
 
-    //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
-    pass_CAT_msgs_to_RADIO();
+    // Check on any CIV activity
+    time_current_baseloop = millis();
+    //if ((time_current_baseloop - time_last_baseloop) > BASELOOP_TICK) {
+        // ----------------------------------  check, whether there is something new from the radio
+        //if (time_current_baseloop>t_RadioCheck) 
+    time_last_baseloop = time_current_baseloop;
       
-    //FrequencyRequest();   // Normally the frequency will be polled by external computer but if a local display is used, then poll it here
+    //if (CAT_Freq_Check.check() == 1)
+    if (1);
+    {
+      uint64_t VFOA_temp = VFOA;
+      uint8_t ret_val = 0;
+      
+      ret_val = check_CIV(time_current_baseloop);  // got frequency
 
+      if (ret_val == 1) // got frequency
+      {
+        if(VFOA_temp != VFOA)  // Update display if changed
+        {
+          VFOA_temp = VFOA;
+          if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands is VFO is in the current band
+            changeBands(0);  // new band
+          displayFreq();   // Update screen
+        }
+      }
+      else if (ret_val == 2)  // got modulation mode
+      {
+        DPRINT("Mode = "); DPRINT(radio_mode); DPRINT(" Filter = "); DPRINTLN(radio_filter);  
+        //DPRINTLN(getModMode());
+        selectMode(radio_mode);
+      }
+    }
+
+    //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
+    pass_CAT_msgs_to_RADIO();  // if a PC is connected pass on CAT commands to the RADIO transparently.   At this point no collision handling performed.
+    
     #ifdef DEBUG
         time_sp = millis();
     #endif
@@ -1344,5 +1360,3 @@ COLD void set_MF_Service(uint8_t new_client_name) // this will be the new owner 
                                  // When it expires it will be switched to default
     // DPRINTF("New MF Knob Client ID is "); DPRINTLN(MF_client);
 }
-
-

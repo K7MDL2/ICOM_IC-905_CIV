@@ -87,3 +87,4 @@ Made several fixes.  Can now bidirectionally tune from either end on all bands i
 7/11/2024
 
 Moved CIV function calls into CIV.cpp/CIV.h.  Can exttrnd comms wit hte radio in the CIV file and unclutter the main .ino file some.
+Now decoding radio and filter setting messages from the radio. The mode is now displayed on touchscreen.  Will do the same for filter and be send the mode and filter to the radio.
