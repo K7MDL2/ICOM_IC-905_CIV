@@ -11,11 +11,6 @@
 #include "RadioConfig.h"
 #include "Tuner.h"
 
-#ifdef USE_RS_HFIQ
-    extern SDR_RS_HFIQ RS_HFIQ;		// init the RS-HFIQ library
-    extern void send_variable_cmd_to_RSHFIQ(const char * str, char * cmd_str);
-    extern char * convert_freq_to_Str(uint64_t freq);
-#endif
 extern uint8_t curr_band;   // global tracks our current band setting.
 extern uint64_t VFOA;  // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
 extern struct Band_Memory bandmem[];

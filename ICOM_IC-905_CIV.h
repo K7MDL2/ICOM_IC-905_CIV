@@ -1,15 +1,9 @@
 #ifndef _IC_905_CIV_H_
 #define _IC_905_CIV_H_
 
-//  SDR_RA8875.h
+//  ICOM_IC-905.h
 //
 //  Header File for the Main Arduino program file
-//
-//  Spectrum, Display, full F32 library conversion completed 3/2021. Uses FFTXXXX_IQ_F32 FFT I and Q version files
-//      XXXX can be the 256, 1024, 2048 or 4096 versions.
-//  Spectrum uses the raw FFT output and is not calibrated.
-//
-//  Two-Tone test tones are enabled for transmit audio path by enabled ATU button before TX.
 //
 #include <Arduino.h>                    // from Arduino
 #include <avr/pgmspace.h>               // from Arduino
@@ -283,9 +277,9 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define BW3_2       7
 #define BW4_0       8
 #define BW6_0       9
-#define FIL1        1
-#define FIL2        2
-#define FIL3        3
+#define FILT1       1
+#define FILT2       2
+#define FILT3       3
 #define VFO_A       1
 #define VFO_B       0
 

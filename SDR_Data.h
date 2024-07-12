@@ -7,7 +7,6 @@
 
 //#include "RadioConfig.h"
 #include "ICOM_IC-905_CIV.h"
-//#include "SDR_RA8875.h"
 
 struct Band_Memory bandmem[BANDS] = {
     // name         lower     upper         VFOA    Md_A       VFOA-1  mode1     VFOA-2     md2      VFOB    modeB filt  varfil  bandnum   ts agc     SPLIT RT  XT ATU ANT   BPF ATTEN   AttByp att_DB   PREAMP   SSPL  bmap  XV#     Xvtr_IF  XPwr DialCal Decode
