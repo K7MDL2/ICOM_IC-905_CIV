@@ -438,17 +438,18 @@ struct Filter_Settings filter[FILTER] = {
 
 //Remember filter per mode  Last field "Width" is writable
 struct Modes_List modeList[MODES_NUM] = {
-    {0, "LSB   ", BW2_8},
-    {1, "USB   ", BW2_8},
-    {2, "AM    ", BW6_0},
-    {3, "CW    ", BW0_7},
-    {4, "RTTY  ", BW4_0},
-    {5, "FM    ", BW6_0},
-    {7, "CW-R  ", BW0_7},
-    {8, "RTTY-R", BW4_0},
-    {17,"DV    ", BW6_0},
-    {22,"DD    ", BW6_0},
-    {23,"ATV   ", BW6_0}
+    {0x00, "LSB   ", BW2_8},
+    {0x01, "USB   ", BW2_8},
+    {0x02, "AM    ", BW6_0},
+    {0x03, "CW    ", BW0_7},
+    {0x04, "RTTY  ", BW4_0},
+    {0x05, "FM    ", BW6_0},
+    //{0x06, "W-FM  ", BW6_0},  // NA for IC-905
+    {0x07, "CW-R  ", BW0_7},
+    {0x08, "RTTY-R", BW4_0},
+    {0x17,"DV    ", BW6_0},  // hex 17 is 23 dec
+    {0x22,"DD    ", BW6_0},  // hex 22 is 34 dec
+    {0x23,"ATV   ", BW6_0}   // hex 23 is 35 dec
  };
 
 struct TuneSteps  tstep[TS_STEPS] = {

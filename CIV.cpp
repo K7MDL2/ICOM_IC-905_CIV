@@ -103,25 +103,24 @@ uint8_t check_CIV(uint32_t time_current_baseloop) {
   CIVresultL = civ.readMsg(CIV_ADDR_905);
 
   if (CIVresultL.retVal <= CIV_NOK) {  // valid answer received !
-#ifdef debug
-    //DPRINTF('.');
-#endif
     if (CIVresultL.retVal == CIV_OK_DAV) {  // Data available
       // Check for Frequency message type
-      if ((CIVresultL.cmd[1] == CIV_C_F_SEND[1]) ||  // command CIV_C_F_SEND received
-          (CIVresultL.cmd[1] == CIV_C_F_READ[1])) {  // command CIV_C_F_READ received
-        DPRINTF("CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
+      if ((CIVresultL.cmd[1] == CIV_C_F_READ[1]) ||  // command CIV_C_F_SEND received
+          (CIVresultL.cmd[1] == CIV_C_F_SEND[1])) {  // command CIV_C_F_READ received
+        DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
         VFOA = (uint64_t)CIVresultL.value;
         msg_type = 1;
         freqReceived = true;
       }
       // Test for MODE change
-      else if ((CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
-               (CIVresultL.cmd[1] == CIV_C_MOD_READ[1])) {  // command CIV_C_MODE_READ received
+      if ((CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
+          (CIVresultL.cmd[1] == CIV_C_MOD_READ[1]) )
+          //(CIVresultL.cmd[1] == CIV_C_F26_SEND[1]) ||
+          //(CIVresultL.cmd[1] == CIV_C_F26_SEND[1])) 
+        {  // command CIV_C_MODE_READ received
         radio_mode = CIVresultL.value/100;
         radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
-        //radioModMode_t radio_mode = static_cast<radioModMode_t>(radio_mode);
-        //radioFilter_t radio_filter = static_cast<radioModMode_t>(filter_mode);      
+        DPRINTF("check_CIV: CI-V Returned Mode and Filter: "); DPRINT(radio_mode); DPRINT(" ");DPRINTLN(radio_filter);    
         msg_type = 2;
       }  // Mode changed
     }  // Data available
@@ -129,22 +128,22 @@ uint8_t check_CIV(uint32_t time_current_baseloop) {
     // ----------------------------------  do a query for frequency, if necessary
     // poll every 500 * 10ms = 5sec until a valid frequency has been received
     if ((freqReceived == false) && (CAT_Freq_Check.check() == 1)) {
-      civ.writeMsg(CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
+      civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wChk);
       //if (CIVresultL.retVal<=CIV_NOK)
-      DPRINTF("Poll for RADIO Frequency Status: ");
-      DPRINTLN(CIVresultL.retVal);
-      DPRINTF("Poll for RADIO Frequency Return Value: ");
-      DPRINTLN((uint8_t)CIVresultL.value);
+      DPRINTF("check_CIV: Poll for RADIO Frequency Status: "); DPRINTLN(CIVresultL.retVal);
+      DPRINTF("check_CIV: Poll for RADIO Frequency Return Value: "); DPRINTLN((uint8_t)CIVresultL.value);
     }
   }  // valid answer received
   return msg_type;
 }  // if BASELOOP_TICK
 
+// Early test function, not used for now
 void SendCIVmsg(void) {
-  uint8_t str[20] = "\xFE\xFE\xE0\x05\x00\x00\x20\x44\x01\xFD\x00";
+  //uint8_t str[20] = "\xFE\xFE\xE0\x05\x00\x00\x20\x44\x01\xFD\x00";  // Just a test string
+  uint8_t str[20] = "\x00\x01\x01\x02";  // Just a test string
   //  writeMsg format is address, command byte(s), data bytes (length byte plus actual data bytes), type of response expected
   if (CAT_Poll.check() == 1) {
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_MOD1_SEND, str, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, str, CIV_wChk);
     //CIVresultL = civ.writeMsg (CIV_ADDR_905, CIV_C_F_READ, CIV_D_NIX, CIV_wChk);
     PC_Debug_port.print("retVal of writeMsg: ");
     PC_Debug_port.println(retValStr[CIVresultL.retVal]);
@@ -156,6 +155,7 @@ void SendCIVmsg(void) {
   //PC_Debug_port.print(" Frequency: "); Serial.println(CIVresultL.value);
 }
 
+// Early test function - not used for now.
 void RcvCIVmsg(void) {
   // give the radio some time to answer - version 2:
   // do a cyclic polling until data is available
@@ -231,4 +231,37 @@ uint8_t getByteResponse(const uint8_t m_Counter, const uint8_t offset, const uin
 	uint8_t ret = bcdByte(buffer[offset]) * 100;
     ret += bcdByte(buffer[offset+1]);
     return ret;
+}
+
+
+// This is not working yet
+uint8_t getRadioMode(void)
+{
+  uint8_t md = 0;
+  //uint8_t ret_val = 0;
+
+  //FrequencyRequest();
+  // ask for the ModMode and Filterinfo
+  //CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_MOD_READ, CIV_D_NIX, CIV_wChk);
+  //CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_MOD1_SEND, CIV_D_NIX, CIV_wFast);
+  SendCIVmsg();
+  if (CIVresultL.retVal <= CIV_NOK) {
+      DPRINT("getRadioMode: Mode request got OK back: "); DPRINTLN(CIVresultL.value);
+  }
+  //md = check_CIV(millis());
+  //civ.readMsg(CIV_ADDR_905);
+  //if (CIVresultL.retVal <= CIV_NOK) {
+      //DPRINT("getRadioMode: readMsg request got OK back: "); DPRINTLN(CIVresultL.value);
+  //}
+  //if (ret_val == 2)  // got modulation mode
+  //    {
+  //      DPRINT("getRadioMode: Mode = "); DPRINT(radio_mode); DPRINT(" Filter = "); DPRINTLN(radio_filter);  
+  //      //DPRINTLN(getModMode());
+  //      selectMode(radio_mode);
+  //    }
+
+  //ICxxxx.loopp(millis());
+  //md = ICxxxx.getModMode();
+  DPRINT("getRadioMode: Getting mode from radio: ");DPRINTLN(md);
+  return md;
 }

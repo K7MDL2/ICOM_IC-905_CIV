@@ -1,17 +1,28 @@
 //
 //  Vfo.cpp
 //
-
-// ToDO:  Fix up Quadrature Ouput config (VFO_MULT==1) to work with OCXO_10MHz preoperly).  Currently code is either/or.
-
 //
 #include "ICOM_IC-905_CIV.h"
-#include "Vfo.h"
 #include "RadioConfig.h"
+#include "Vfo.h"
 #include <CIVmaster.h>
 
 extern uint64_t VFOA;  // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
-extern int64_t Fc;
+extern int64_t Fc;     // Fc, Filter offsets, XIT and RIT offsets should all be taken into account for the value of Freq
+extern  CIV     civ;
+extern  CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
+CIVresult_t CIVresultL_vfo;
+void formatFreq(uint64_t vfo);
+uint8_t vfo_dec[7] = {};  // hold 6 or 7 bytes (length + 5 or 6 for frequency, bcd encoded bytes)
+const String retValStr[7] = {
+    "CIV_OK",
+    "CIV_OK_DAV",
+    "CIV_NOK",
+    "CIV_HW_FAULT",
+    "CIV_BUS_BUSY",
+    "CIV_BUS_CONFLICT",
+    "CIV_NO_MSG"
+};
 
 //////////////////////////Initialize VFO/DDS//////////////////////////////////////////////////////
 COLD void initVfo(void)
@@ -19,29 +30,8 @@ COLD void initVfo(void)
     // placeholder
 }
 
-// Fc, Filter offsets, XIT and RIT offsets should all be taken into account for the value of Freq
-extern  CIV     civ;
-CIVresult_t CIVresultL_vfo;
-extern  CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
-extern void SendCIVmsg(void);
-void formatFreq(uint64_t vfo);
-uint32_t MHz;
-uint16_t Hz;
-uint16_t KHz;
-uint8_t vfo_dec[7] = {};  // hold 6 or 7 bytes (length + 5 or 6 for frequency, bcd encoded bytes)
-
 COLD void SetFreq(uint64_t Freq)
 { 
-    const String retValStr[7] = {
-        "CIV_OK",
-        "CIV_OK_DAV",
-        "CIV_NOK",
-        "CIV_HW_FAULT",
-        "CIV_BUS_BUSY",
-        "CIV_BUS_CONFLICT",
-        "CIV_NO_MSG"
-    };
-
     formatFreq(Freq);  // Convert to BCD string
     //PC_Debug_port.printf("VFO: hex in SetFreq: %02X %02X %02X %02X %02X %02X %02X\n", vfo_dec[0], vfo_dec[1], vfo_dec[2], vfo_dec[3], vfo_dec[4], vfo_dec[5], vfo_dec[6]);
     CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, CIV_C_F1_SEND, vfo_dec, CIV_wFast);

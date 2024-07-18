@@ -397,21 +397,23 @@ void setup()
 
     // see if the card is present and can be initialized:
     SD_CardInfo();
+    
     // open or create our config file.  Filenames follow DOS 8.3 format rules
     Open_SD_cfgfile();
+    
     // test our file
     // make a string for assembling the data to log:
 
     // Normally just read config from SD card assuming it is not corrupt.
-    // There mnaybe times yu want to force a copy from default memory (SDR_DATA.h defaults) at bootup overriding what is on the SD card
-    // This woudl occur when you change the structures in SDR_DAta.h
+    // There maybe times yu want to force a copy from default memory (SDR_DATA.h defaults) at bootup overriding what is on the SD card
+    // This would occur when you change the structures in SDR_DAta.h
     // You can force a clean default values write here.
     
-    write_db_tables();   // comment out for normal operation.  Often best to leave in for dev.
+    //write_db_tables();   // comment out for normal operation.  Often best to leave in for dev.
 
     // Resume normal read user value into memory overwriting defaults.
     read_db_tables();              // Read in stored values to memory
-    write_radiocfg_h();         // write out the #define to a file on the SD card.
+    //write_radiocfg_h();         // write out the #define to a file on the SD card.
                                     // This could be used by the PC during compile to override the RadioConfig.h
 
     // -------- Setup our radio settings and UI layout --------------------------------
@@ -521,17 +523,28 @@ void loop()
           displayFreq();   // Update screen
         }
       }
-      else if (ret_val == 2)  // got modulation mode
+      
+      if (ret_val == 2)  // got modulation mode
       {
-        DPRINT("Mode = "); DPRINT(radio_mode); DPRINT(" Filter = "); DPRINTLN(radio_filter);  
-        //DPRINTLN(getModMode());
-        selectMode(radio_mode);
+        for (uint8_t i = 0; i < MODES_NUM; i++)
+        {
+          if (modeList[i].mode_num == hexToDec(radio_mode))
+          {
+              DPRINTF("Loop: Mode index = "); DPRINTLN(i); 
+              selectMode(i);
+              DPRINTF("Loop: Mode = "); DPRINT(radio_mode); 
+              DPRINTF(" Filter = "); DPRINTLN(radio_filter);  
+          }
+        }
       }
     }
 
     //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
     pass_CAT_msgs_to_RADIO();  // if a PC is connected pass on CAT commands to the RADIO transparently.   At this point no collision handling performed.
     
+
+    show_CIV_log();
+
     #ifdef DEBUG
         time_sp = millis();
     #endif

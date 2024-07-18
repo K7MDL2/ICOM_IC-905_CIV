@@ -691,17 +691,19 @@ const String radioOnOffStr[6] = {
 };
 
 // clear test translation of the modulation modes
-const String modModeStr[11] = {
+const String modModeStr[MODES_NUM+1] = {
   "LSB   ", // 00 (00 .. 08 is according to ICOM's documentation) 
   "USB   ", // 01
   "AM    ", // 02
   "CW    ", // 03
   "RTTY  ", // 04
   "FM    ", // 05
-  "WFM   ", // 06
+  //"WFM   ", // 06
   "CW-R  ", // 07
   "RTTY-R", // 08
   "DV    ", // 09 (Note: on the ICOM CIV bus, this is coded as 17 in BCD-code, i.e. 0x17)
+  "DD    ",
+  "ATV   ",
   "NDEF  "  // 10
 };
 

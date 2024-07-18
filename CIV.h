@@ -27,6 +27,7 @@ void show_CIV_log(void);
 void civ_setup(uint32_t currentTime);
 radioModMode_t getModMode(void);
 uint8_t getByteResponse(const uint8_t m_Counter, const uint8_t offset, const uint8_t buffer[]);
+uint8_t getRadioMode(void);
 
 #ifdef GPS
   void pass_GPS(void);

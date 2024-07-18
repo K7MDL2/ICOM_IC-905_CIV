@@ -4,6 +4,7 @@
 
 #include "RadioConfig.h"
 #include "ICOM_IC-905_CIV.h"
+#include <CIVmaster.h>
 
 #ifdef USE_RA8875
     extern RA8875 tft;
@@ -60,6 +61,19 @@ extern int16_t rit_offset_last;   // global RIT offset value in Hz.
 extern int16_t xit_offset_last;   // global RIT offset value in Hz.
 extern void update_icon_outline(void);
 extern void ringMeter(int val, int minV, int maxV, int16_t x, int16_t y, uint16_t r, const char* units, uint16_t colorScheme, uint16_t backSegColor, int16_t angle, uint8_t inc);
+extern uint8_t getRadioMode(void);
+extern  CIV     civ;
+extern  CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
+
+const String retValStr[7] = {
+    "CIV_OK",
+    "CIV_OK_DAV",
+    "CIV_NOK",
+    "CIV_HW_FAULT",
+    "CIV_BUS_BUSY",
+    "CIV_BUS_CONFLICT",
+    "CIV_NO_MSG"
+};
 
 void changeBands(int8_t direction);
 void pop_win_up(uint8_t win_num);
@@ -111,7 +125,7 @@ void PAN(int8_t delta);
 void setPAN(int8_t toggle);
 void digital_step_attenuator_PE4302(int16_t _atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 void setEncoderMode(uint8_t role);
-
+void getMode(void);
 
 //
 //----------------------------------- Skip to Ham Bands only ---------------------------------
@@ -206,9 +220,9 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     //selectBandwidth(bandmem[curr_band].filter);
     // dB level is set elsewhere and uses value in the dB in this function.
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-    // selectMode(0);
-    DPRINTLNF("changeBands: Set Mode");
-    setMode(2);  // 0 is set value in database for both VFOs
+    //getMode();
+    DPRINTLNF("changeBands: Get and Set Mode");
+    setMode(2);  // 2 is set value in database for both VFOs
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
     AFgain(0);
@@ -272,16 +286,16 @@ COLD void setMode(int8_t dir)
         else
             _mndx += dir; // forces a step higher or lower then current
 
-        if (_mndx > MODES_NUM - 1) // limit in case of encoder counts
+        if (_mndx > MODES_NUM - 1) // limit in case of encoder countssetMode
             _mndx = MODES_NUM - 1;
 
         if (_mndx < 0) // limit in case of encoder counts
             _mndx = 0;
 
-        bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
+        //bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
-    selectMode((uint8_t)_mndx); // Select the mode for the Active VFO
+    selectMode((uint8_t) _mndx); // Select the mode for the Active VFO
 
     // Update the filter setting per mode
     Filter(2);
@@ -923,7 +937,7 @@ COLD void XIT(int8_t delta)
     if (bandmem[curr_band].XIT_en == ON)
     {
         _offset = xit_offset; // Get cuurent value
-        _offset += delta * tstep[user_settings[user_Profile].XIT_ts].step;
+        _offset += delta * tstep[user_settings[user_Profile].XIT_ts].step;                               
 
         if (_offset > 9999) // Limit the value between +/- 10KHz
             _offset = 9999;
@@ -1384,12 +1398,7 @@ COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
         user_settings[user_Profile].xmit = OFF;
         if (PTT_OUT1 != 255)
             digitalWrite(PTT_OUT1, HIGH);
- 
-#ifdef USE_RS_HFIQ
-        RS_HFIQ.send_fixed_cmd_to_RSHFIQ("*X0"); // RS-HFIQ TX OFF
-        delay(5);
-        selectFrequency(0);
-#endif
+
         // enable line input to pass to headphone jack on audio card, set audio levels
         //TX_RX_Switch(OFF, mode_idx, OFF, OFF, OFF, OFF, 0.5f);
         // int TX,                 // TX == 1, RX == 0
@@ -1405,12 +1414,6 @@ COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
         user_settings[user_Profile].xmit = ON;
         if (PTT_OUT1 != 255)
             digitalWrite(PTT_OUT1, LOW);
-
-#ifdef USE_RS_HFIQ
-        selectFrequency(0);
-        delay(5);                                // slight delay needed for reliable changeover
-        RS_HFIQ.send_fixed_cmd_to_RSHFIQ("*X1"); // RS-HFIQ TX ON
-#endif
 
         //TX_Timeout.reset(); // Reset our Runaway TX timer.  Main loop will watch for this to trip calling back here to flip back to RX.
 
@@ -1714,7 +1717,6 @@ COLD void Display()
 
 COLD void TouchTune(int16_t touch_Freq)
 {
-
     if (popup == 1) return; // skip if menu window is active
     selectFrequency(0);
     displayFreq();
@@ -1958,6 +1960,57 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
 
 COLD void selectMode(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
+    CIVresult_t CIVresultL_vfo;
+
+    DPRINT("selectMode: mode index: "); DPRINTLN(mndx);  	
+
+    if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
+    {
+        DPRINTF("request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
+        mndx = MODES_NUM -3;    // go to start of list
+    }
+
+    uint8_t mode_str[4] = {};
+    memcpy(mode_str, CIV_C_MOD_SET, 4);  // copy a template then sub in the mode.
+    mode_str[3] = modeList[mndx].mode_num;  // send the mode values
+
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, mode_str, CIV_D_NIX, CIV_wFast);
+    PC_Debug_port.print("VFO: retVal of Mode cmd writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL_vfo.retVal]);
+    
+    if (CIVresultL_vfo.retVal == CIV_OK)
+    {
+        DPRINT("Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
+        bandmem[curr_band].mode_A = mndx; // get current mode table index
+        displayMode();
+    }
+    return;
+}
+
+//  Mostly used when channging bands fromm the remote side.  
+//  When changing from the radio it sends mode and fitlers.
+COLD void getMode(void)   // Ask the radio what mode it is in
+{
+    uint8_t i;
+    
+    uint8_t mndx = 255;
+    
+    mndx = getRadioMode();  // ask radio what mode it is in and sync this controller to it
+
+    DPRINT("getMode: Mode index from radio is "); DPRINTLN(mndx);
+    
+    //selectMode(mndx);
+
+    for (i=0; i< MODES_NUM; i++)
+    { 
+        if (mndx == modeList[i].mode_num)
+        {
+	        DPRINT("getMode: Set mode to "); DPRINTLN(modeList[i].mode_label);  	
+            bandmem[curr_band].mode_A = i; // get current mod
+        }
+    }
+
+    DPRINT("getMode: Radio mode is "); DPRINTLN(modeList[i].mode_label);
+/*
   //DPRINTLN(mndx);
   for (int i=0; i< MODES_NUM; i++)
   { 
@@ -1967,5 +2020,6 @@ COLD void selectMode(uint8_t mndx)   // Change Mode of the current active VFO by
       bandmem[curr_band].mode_A = i; // get current mod
     }
   }
+*/
  	displayMode();
 }
