@@ -86,5 +86,9 @@ Made several fixes.  Can now bidirectionally tune from either end on all bands i
 
 7/11/2024
 
-Moved CIV function calls into CIV.cpp/CIV.h.  Can exttrnd comms wit hte radio in the CIV file and unclutter the main .ino file some.
+Moved CIV function calls into CIV.cpp/CIV.h.  Can extend comms with the radio in the CIV file and unclutter the main .ino file some.
 Now decoding radio and filter setting messages from the radio. The mode is now displayed on touchscreen.  Will do the same for filter and be send the mode and filter to the radio.
+
+7/18/2024 
+
+Mode now stays in sync between radio and remote, either side can initiate change and it is remembered. ThE remote stores the last used mode and frequency and other parameters on each band change to the SD card. it is read upon startup and each band change will set the radio. If you just send a new band frewuency to the radio the radio will not change the mode so theremtoe must remember it. Using the bandstack value for each band is probably a way to make the radio's last used mode and filter apply, let the remote follow. For noW the radio will follow the remote. If you change bands, freq, or mode (or any combo like on band change) from the radio side, the remote will follow. Next up is to get the filters working the same. One can go on and get every radio parameter but I think I will focus on the most used stuff, maybe some memories.  But first need to set up the band decoder GPIO outputs per band for relays, PTT breakout.
