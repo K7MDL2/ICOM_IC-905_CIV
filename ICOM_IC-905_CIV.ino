@@ -531,7 +531,7 @@ void loop()
           if (modeList[i].mode_num == hexToDec(radio_mode))
           {
               DPRINTF("Loop: Mode index = "); DPRINTLN(i); 
-              selectMode(i);
+              set_Mode_from_Radio(i);
               DPRINTF("Loop: Mode = "); DPRINT(radio_mode); 
               DPRINTF(" Filter = "); DPRINTLN(radio_filter);  
           }

@@ -11,7 +11,7 @@
 #include <Arduino.h>
 #include "ICOM_IC-905_CIV.h"
 #include "RadioConfig.h"
-#include <CIVcmds.h>                    // ICm CIV library https://github.com/WillyIoBrok/CIVmasterLib
+//#include <CIVcmds.h>                    // https://github.com/K7MDL2/CIVmasterLib is my fork Icom CIV library https://github.com/WillyIoBrok/CIVmasterLib extended for the 905
 #include <CIVmaster.h>                  // CIVcmds.h is automatically included in addition
 #include <ICradio.h>                    // this would include CIVcmds.h and CIVmaster.h, if not included before !
 

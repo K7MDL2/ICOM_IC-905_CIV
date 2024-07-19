@@ -102,36 +102,42 @@ uint8_t check_CIV(uint32_t time_current_baseloop) {
   msg_type = 0;
   CIVresultL = civ.readMsg(CIV_ADDR_905);
 
+  //reqReceived = false;
   if (CIVresultL.retVal <= CIV_NOK) {  // valid answer received !
     if (CIVresultL.retVal == CIV_OK_DAV) {  // Data available
       // Check for Frequency message type
-      if ((CIVresultL.cmd[1] == CIV_C_F_READ[1]) ||  // command CIV_C_F_SEND received
-          (CIVresultL.cmd[1] == CIV_C_F_SEND[1])) {  // command CIV_C_F_READ received
-        DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
-        VFOA = (uint64_t)CIVresultL.value;
-        msg_type = 1;
-        freqReceived = true;
+      if ((CIVresultL.cmd[1] == CIV_C_F_READ[1]) ||  // command CIV_C_F_READ received
+          (CIVresultL.cmd[1] == CIV_C_F_SEND[1])) 
+      {  // command CIV_C_F_SEND received
+          DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
+          VFOA = (uint64_t)CIVresultL.value;
+          msg_type = 1;
+          freqReceived = true;
       }
       // Test for MODE change
-      if ((CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ||  // command CIV_C_MODE_SEND received
-          (CIVresultL.cmd[1] == CIV_C_MOD_READ[1]) )
-          //(CIVresultL.cmd[1] == CIV_C_F26_SEND[1]) ||
-          //(CIVresultL.cmd[1] == CIV_C_F26_SEND[1])) 
+      if ((CIVresultL.cmd[1] == CIV_C_MOD_READ[1]) ||  // command CIV_C_MODE_SEND received
+          (CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ||
+          (CIVresultL.cmd[1] == CIV_C_F26_READ[1]) ||
+          (CIVresultL.cmd[1] == CIV_C_F26_SEND[1]) ) 
         {  // command CIV_C_MODE_READ received
         radio_mode = CIVresultL.value/100;
         radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
         DPRINTF("check_CIV: CI-V Returned Mode and Filter: "); DPRINT(radio_mode); DPRINT(" ");DPRINTLN(radio_filter);    
         msg_type = 2;
+        freqReceived = false;
       }  // Mode changed
     }  // Data available
 
     // ----------------------------------  do a query for frequency, if necessary
     // poll every 500 * 10ms = 5sec until a valid frequency has been received
     if ((freqReceived == false) && (CAT_Freq_Check.check() == 1)) {
-      civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wChk);
-      //if (CIVresultL.retVal<=CIV_NOK)
-      DPRINTF("check_CIV: Poll for RADIO Frequency Status: "); DPRINTLN(CIVresultL.retVal);
-      DPRINTF("check_CIV: Poll for RADIO Frequency Return Value: "); DPRINTLN((uint8_t)CIVresultL.value);
+      civ.writeMsg(CIV_ADDR_905, CIV_C_F_SEND, CIV_D_NIX, CIV_wChk);
+      if (CIVresultL.retVal<=CIV_NOK)
+      {
+        DPRINTF("check_CIV: Poll for RADIO Frequency Status: "); DPRINT(CIVresultL.retVal);
+        DPRINTF("  Poll for RADIO Frequency Return Value: "); DPRINTLN((uint8_t)CIVresultL.value);
+        msg_type = 1;
+      }
     }
   }  // valid answer received
   return msg_type;

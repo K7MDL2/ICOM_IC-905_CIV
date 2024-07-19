@@ -64,6 +64,7 @@ extern void ringMeter(int val, int minV, int maxV, int16_t x, int16_t y, uint16_
 extern uint8_t getRadioMode(void);
 extern  CIV     civ;
 extern  CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
+extern uint8_t check_CIV(uint32_t time_current_baseloop);
 
 const String retValStr[7] = {
     "CIV_OK",
@@ -212,26 +213,23 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     // Set the new band decoder output pattern for this band change
 // uint16_t BandDecodePatternByte = bandmem[curr_band].bandDecode;
 
-    //codec1.muteHeadphone(); // remove audio thumps during hardware transients
-
     DPRINTLNF("changeBands: Set other per band settings");
     // Split(0);
     setAtten(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     //selectBandwidth(bandmem[curr_band].filter);
     // dB level is set elsewhere and uses value in the dB in this function.
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-    //getMode();
-    DPRINTLNF("changeBands: Get and Set Mode");
-    setMode(2);  // 2 is set value in database for both VFOs
+    selectAgc(bandmem[curr_band].agc_mode);
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
     AFgain(0);
     NBLevel(0); // 0 just updates things to be current value
     ATU(-1);    // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.
 
-    #ifndef BYPASS_SPECTRUM_MODULE
-        drawSpectrumFrame(user_settings[user_Profile].sp_preset);
-    #endif
+    // when sending a freq on a new band need to also send desired mode else the mode stays the same as old band.
+    DPRINTF("changeBands: Set VFO A Mode to index "); DPRINTLN(bandmem[curr_band].mode_A);   
+    send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
+
     // Rate(0); Not needed
     // Ant() when there is hardware to setup in the future
     // ATU() when there is hardware to setup in the future
@@ -240,10 +238,10 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     //
     user_settings[user_Profile].last_band = curr_band;
     user_settings[user_Profile].sub_VFO = VFOB;
-    selectAgc(bandmem[curr_band].agc_mode);
-    write_db_tables();
+    
+    write_db_tables();  // Save to SD card
     displayRefresh();
-    //codec1.unmuteHeadphone(); // reduce audio thump from hardware transitions
+
     DPRINTLNF("changeBands: Complete\n");
 }
 
@@ -295,7 +293,7 @@ COLD void setMode(int8_t dir)
         //bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
-    selectMode((uint8_t) _mndx); // Select the mode for the Active VFO
+    send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
     // Update the filter setting per mode
     Filter(2);
@@ -631,7 +629,7 @@ COLD void VFO_AB(void)
         // DPRINTLN(curr_band);
         VFOA = bandmem[curr_band].vfo_A_last = old_VFOB; // Update VFOA to new freq, then update the band index to match
         bandmem[curr_band].mode_A            = old_B_mode;
-        selectMode(old_B_mode); // copy to VFOA mode and apply
+        send_Mode_to_Radio(old_B_mode); // copy to VFOA mode and apply
 
         // DPRINT("Stash sub_VFO values - VFO B: ");
         // DPRINT(old_VFOA);
@@ -1958,15 +1956,47 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
     return 0; // 0 means frequency was not found in the table
 }
 
-COLD void selectMode(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
+// Used to request mode from radio mode
+COLD uint8_t get_Mode_from_Radio(void)   // Change Mode of the current active VFO by increment delta.
+{
+    CIVresult_t CIVresultL_mode;
+
+    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_MOD_READ, CIV_D_NIX, CIV_wFast);
+    DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
+    return CIVresultL_mode.retVal;
+}
+
+// Used to set remote to match the radio mode
+COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
     CIVresult_t CIVresultL_vfo;
 
-    DPRINT("selectMode: mode index: "); DPRINTLN(mndx);  	
+    DPRINT("set_Mode_from_Radio: mode index: "); DPRINTLN(mndx);  	
 
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
-        DPRINTF("request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
+        DPRINTF("set_Mode_from_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
+        mndx = MODES_NUM -3;    // go to start of list
+    }
+
+    uint8_t mode_str[4] = {};
+    memcpy(mode_str, CIV_C_MOD_READ, 4);  // copy a template then sub in the mode.
+    mode_str[3] = modeList[mndx].mode_num;  // send the mode values
+    DPRINT("set_Mode_from_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
+    bandmem[curr_band].mode_A = mndx; // get current mode table index
+    displayMode();
+}
+
+//  Used when changing bands from the remote side.  
+COLD void send_Mode_to_Radio(uint8_t mndx)   // Ask the radio what mode it is in
+{
+CIVresult_t CIVresultL_vfo;
+
+    DPRINT("send_Mode_to_Radio: mode index: "); DPRINTLN(mndx);  	
+
+    if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
+    {
+        DPRINTF("send_Mode_to_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
         mndx = MODES_NUM -3;    // go to start of list
     }
 
@@ -1975,51 +2005,13 @@ COLD void selectMode(uint8_t mndx)   // Change Mode of the current active VFO by
     mode_str[3] = modeList[mndx].mode_num;  // send the mode values
 
     CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, mode_str, CIV_D_NIX, CIV_wFast);
-    PC_Debug_port.print("VFO: retVal of Mode cmd writeMsg: "); PC_Debug_port.println(retValStr[CIVresultL_vfo.retVal]);
+    DPRINTF("send_Mode_to_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
     
     if (CIVresultL_vfo.retVal == CIV_OK)
     {
-        DPRINT("Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
+        DPRINT("send_Mode_to_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
         bandmem[curr_band].mode_A = mndx; // get current mode table index
         displayMode();
     }
     return;
-}
-
-//  Mostly used when channging bands fromm the remote side.  
-//  When changing from the radio it sends mode and fitlers.
-COLD void getMode(void)   // Ask the radio what mode it is in
-{
-    uint8_t i;
-    
-    uint8_t mndx = 255;
-    
-    mndx = getRadioMode();  // ask radio what mode it is in and sync this controller to it
-
-    DPRINT("getMode: Mode index from radio is "); DPRINTLN(mndx);
-    
-    //selectMode(mndx);
-
-    for (i=0; i< MODES_NUM; i++)
-    { 
-        if (mndx == modeList[i].mode_num)
-        {
-	        DPRINT("getMode: Set mode to "); DPRINTLN(modeList[i].mode_label);  	
-            bandmem[curr_band].mode_A = i; // get current mod
-        }
-    }
-
-    DPRINT("getMode: Radio mode is "); DPRINTLN(modeList[i].mode_label);
-/*
-  //DPRINTLN(mndx);
-  for (int i=0; i< MODES_NUM; i++)
-  { 
-    if (mndx == modeList[i].mode_num)
-    {
-	    DPRINT("Set mode to "); DPRINTLN(modeList[i].mode_label);  	
-      bandmem[curr_band].mode_A = i; // get current mod
-    }
-  }
-*/
- 	displayMode();
 }

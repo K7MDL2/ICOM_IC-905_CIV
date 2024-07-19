@@ -61,6 +61,8 @@ void PAN(int8_t delta);
 void digital_step_attenuator_PE4305(int16_t _atten);   // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band);
 void clearMeter(void);
-void selectMode(uint8_t mndx);
+void send_Mode_to_Radio(uint8_t mndx);
+void set_Mode_from_Radio(uint8_t mndx);
+uint8_t get_Mode_from_Radio(void); 
 
 #endif  // _CONTROLS_H_
