@@ -5,6 +5,7 @@
 #include "RadioConfig.h"
 #include "ICOM_IC-905_CIV.h"
 #include <CIVmaster.h>
+#include "Controls.h"
 
 #ifdef USE_RA8875
     extern RA8875 tft;
@@ -62,9 +63,12 @@ extern int16_t xit_offset_last;   // global RIT offset value in Hz.
 extern void update_icon_outline(void);
 extern void ringMeter(int val, int minV, int maxV, int16_t x, int16_t y, uint16_t r, const char* units, uint16_t colorScheme, uint16_t backSegColor, int16_t angle, uint8_t inc);
 extern uint8_t getRadioMode(void);
-extern  CIV     civ;
-extern  CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
+extern CIV     civ;
+extern CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
 extern uint8_t check_CIV(uint32_t time_current_baseloop);
+extern uint8_t radio_mode;         // mode from radio messages
+extern uint8_t radio_filter;       // filter from radio messages
+extern uint8_t radio_data;       // filter from radio messages
 
 const String retValStr[7] = {
     "CIV_OK",
@@ -97,7 +101,6 @@ void Rate(int8_t dir);
 void setMode(int8_t dir);
 void AGC(int8_t dir);
 void Filter(int8_t dir);
-void Variable_Filter(int8_t dir);
 void ATU();
 void Split();
 void setXIT(int8_t toggle);
@@ -126,7 +129,7 @@ void PAN(int8_t delta);
 void setPAN(int8_t toggle);
 void digital_step_attenuator_PE4302(int16_t _atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 void setEncoderMode(uint8_t role);
-void getMode(void);
+
 
 //
 //----------------------------------- Skip to Ham Bands only ---------------------------------
@@ -293,10 +296,15 @@ COLD void setMode(int8_t dir)
         //bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
+    get_Mode_from_Radio(); 
+    
+    while (check_CIV(millis()))  // give time to respond -  Msg_type 3 is bstack results
+        delay(2);
+
     send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
     // Update the filter setting per mode
-    Filter(2);
+    //Filter(2);
     // DPRINTF("Set Mode: ");  DPRINTLN(bandmem[curr_band].mode_A);
     displayMode();
     selectFrequency(0); // Call in case a mode change requires a frequency offset
@@ -313,170 +321,42 @@ COLD void setMode(int8_t dir)
 COLD void Filter(int8_t dir)
 {
     static int8_t direction = 1;
-    int16_t _bw             = bandmem[curr_band].filter; // Change Bandwidth  - cycle down then back to the top
+    int8_t _bw             = bandmem[curr_band].filter_A; // Change Bandwidth  - cycle down then back to the top
 
-    uint8_t _mode;
-
-    // 1. Limit to allowed step range
-    // 2. Cycle up and at top, cycle back down, do nto roll over.
-    if (_bw <= 0)
+    if (dir != 2)
     {
-        _bw       = -1;
-        direction = 1; // cycle upwards
-    }
-
-    if (_bw >= FILTER - 1)
-    {
-        _bw       = FILTER - 1;
-        direction = -1;
-    }
-
-    _mode = bandmem[curr_band].mode_A;
-
-    if (_mode == FM)
-    {
-        _bw = modeList[FM].Width;
-    }
-    else if (_mode == CW || _mode == CW_REV) // CW modes
-    {
-        if (_bw > FILTER - 1) // go to bottom band
+        // 1. Limit to allowed step range
+        // 2. Cycle up and at top, cycle back down, do not roll over.
+        if (_bw <= FILT1)
         {
-            _bw       = FILTER - 1;
-            direction = -1; // cycle downwards
-        }
-        if (_bw <= BW0_25)
-        {
-            _bw       = BW0_25 + 1;
+            _bw       = FILT1; // mode = 0 then change to -1 will add direction == +1 to get 0 later.
             direction = 1; // cycle upwards
         }
-    }
-    else // Non-CW modes
-    {
-        if (_bw > FILTER - 1) // go to bottom band
-        {
-            _bw       = FILTER - 1;
-            direction = -1; // cycle downwards
-        }
-        if (_bw <= BW1_8)
-        {
-            _bw       = BW1_8 + 1;
-            direction = 1; // cycle upwards
-        }
-    }
 
-    if (_mode != FM)
-    {
+        if (_bw >= FILT3)
+        {
+            _bw       = FILT3;
+            direction = -1; // go downward
+        }
+
         if (dir == 0)
-            _bw += direction; // Index our step up or down
+            _bw += direction; // Index our step up or down, if dir == 0 then no change to current value
         else
             _bw += dir; // forces a step higher or lower then current
 
-        if (_bw > FILTER - 1) // limit in case of encoder counts
-            _bw = FILTER - 1;
+        if (_bw > FILT3) // limit in case of encoder counts setMode
+            _bw = FILT3;
 
-        if (_bw < 0) // limit in case of encoder counts
-            _bw = 0;
+        if (_bw < FILT1) // limit in case of encoder counts
+            _bw = FILT1;
 
-        // DPRINT("_bw=");DPRINT(_bw);
     }
+    
+    modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A = (uint8_t) _bw;
 
-    if (dir == 2) // Use last filter width used in this mode, ignore the rest (hopefully it is valid)
-    {
-        if (modeList[_mode].Width < FILTER && modeList[_mode].Width >= 0)
-            _bw = (int16_t)modeList[_mode].Width;
-    }
-    else
-        modeList[_mode].Width = (uint16_t)_bw; // if filter changed without a mode change, store it in last use per mode table.
-
-    bandmem[curr_band].var_filter = filter[modeList[_mode].Width].Width; // update the variable filter setting with new bvalue from button
-    //((uint8_t)_bw);
-    // DPRINTF("Set Filter to "); DPRINTLN(bandmem[curr_band].filter);
-    displayFilter();
-}
-
-// ---------------------------Variable_Filter() ---------------------------
-//          positive counts = Make filter wider   - step rate 100Hz
-//          negative counts = Make filter narrower
-//          2 = use last filter width used in this mode (from modeList table)
-//      This is mode-aware. In non-CW modes we will only cycle through SSB width filters as set in the filter tables
-//
-//  FILTER button
-COLD void Variable_Filter(int8_t dir)
-{
-    //extern int16_t filterCenter;
-    //extern int16_t filterBandwidth;
-    extern void SetFilter(void);
-    int16_t var_bw            = bandmem[curr_band].var_filter;
-    uint16_t var_filt_max     = 6000; // FM is NA (fixed value)
-    uint16_t var_filt_min_CW  = 50;
-    uint16_t var_filt_min_SSB = 150;
-    //extern AudioEffectGain_F32 Amp1_L; // Some well placed gain stages
-    //extern AudioEffectGain_F32 Amp1_R; // Some well placed gain stages
-
-    var_bw = bandmem[curr_band].var_filter; // get current filter width value
-
-    if (var_bw < 1000)        // 100Hz steps above 1KHz, 50Hz below
-        var_bw += (dir * 50); // 50Hz per step
-    else if (var_bw < 3000)
-        var_bw += (dir * 100); // 100Hz per step
-    else
-        var_bw += (dir * 200); // 200Hz per step up to max
-
-    if (var_bw >= var_filt_max)
-        var_bw = var_filt_max;
-
-    if (bandmem[curr_band].mode_A == FM)
-    {
-        var_bw = modeList[FM].Width;
-    }
-    else if (bandmem[curr_band].mode_A <= CW_REV)
-    {
-        if (var_bw <= var_filt_min_CW)
-            var_bw = var_filt_min_CW;
-
-        //filterCenter                  = user_settings[user_Profile].pitch; // Use pitch since this is a CW filter
-        //filterBandwidth               = var_bw;
-        bandmem[curr_band].var_filter = (uint16_t)var_bw; // Store our new filter width
-/*
-        float CW_boost = 0.0f;
-        if (var_bw < 51)
-            CW_boost = 18.0f;
-        else if (var_bw < 101)
-            CW_boost = 16.0f;
-        else if (var_bw < 251)
-            CW_boost = 14.0f;
-        else if (var_bw < 501)
-            CW_boost = 12.0f;
-        else if (var_bw < 701)
-            CW_boost = 9.0f;
-        else if (var_bw < 1001)
-            CW_boost = 6.0f;
-        else
-        
-            CW_boost = 0.0f;
-*/
-        //AudioNoInterrupts();
-        //Amp1_L.setGain_dB(AUDIOBOOST + CW_boost); // Adjustable fixed output boost in dB.
-        //Amp1_R.setGain_dB(AUDIOBOOST + CW_boost);
-        //AudioInterrupts();
-
-        // DPRINTF("Set CW Variable Filter = "); DPRINTLN(var_bw);
-    }
-    else
-    {
-        if (var_bw <= var_filt_min_SSB)
-            var_bw = var_filt_min_SSB;
-
-        //filterCenter                  = (var_bw / 2) + var_filt_min_SSB;
-        //filterBandwidth               = var_bw;
-        bandmem[curr_band].var_filter = (uint16_t)var_bw; // Store our new filter width
-
-        // DPRINTF("Set Variable Filter to "); DPRINTLN(bandmem[curr_band].var_filter);
-    }
-    // ToDo: Set the button filter index to closest value of the current variable filter to permit mixed operation of encoder and button
-
-    //SetFilter();
-    //displayVarFilter();
+    DPRINTF("Set Filter to "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);
+    send_Mode_to_Radio(bandmem[curr_band].mode_A);
+    //displayFilter();
 }
 
 // ---------------------------Rate() ---------------------------
@@ -971,6 +851,28 @@ COLD void Split(uint8_t state)
             bandmem[curr_band].split = ON;
     }
     displaySplit();
+    displayFreq();
+    // DPRINTF("Set Split to "); DPRINTLN(bandmem[curr_band].split);
+}
+
+// DATA ON/Off button
+//   state = 0 sets DATA state off
+//   state = 1 sets DATA state on
+//   state = 2 toggles DATA state
+COLD void DATA(uint8_t state)
+{
+    if (state == 0)
+        bandmem[curr_band].data_A = OFF;
+    if (state == 1)
+        bandmem[curr_band].data_A = ON;
+    if (state == 2)
+    {
+        if (bandmem[curr_band].data_A == ON)
+            bandmem[curr_band].data_A = OFF;
+        else if (bandmem[curr_band].data_A == OFF)
+            bandmem[curr_band].data_A = ON;
+    }
+    displayDATA();
     displayFreq();
     // DPRINTF("Set Split to "); DPRINTLN(bandmem[curr_band].split);
 }
@@ -1961,17 +1863,18 @@ COLD uint8_t get_Mode_from_Radio(void)   // Change Mode of the current active VF
 {
     CIVresult_t CIVresultL_mode;
 
-    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_MOD_READ, CIV_D_NIX, CIV_wFast);
+    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wChk);
     DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
     return CIVresultL_mode.retVal;
 }
 
-// Used to set remote to match the radio mode
+// Used to set remote to match the radio mode use mode index sent by radio
 COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
-    CIVresult_t CIVresultL_vfo;
-
-    DPRINT("set_Mode_from_Radio: mode index: "); DPRINTLN(mndx);  	
+    //DPRINT("set_Mode_from_Radio: mode index: "); DPRINTLN(mndx);  	
+    //CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wFast);
+    //while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
+    //                delay(2);
 
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
@@ -1979,39 +1882,90 @@ COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current acti
         mndx = MODES_NUM -3;    // go to start of list
     }
 
-    uint8_t mode_str[4] = {};
-    memcpy(mode_str, CIV_C_MOD_READ, 4);  // copy a template then sub in the mode.
-    mode_str[3] = modeList[mndx].mode_num;  // send the mode values
     DPRINT("set_Mode_from_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
     bandmem[curr_band].mode_A = mndx; // get current mode table index
+
+    
+    displayDATA(); // update display
     displayMode();
+    displayFilter();
 }
 
 //  Used when changing bands from the remote side.  
-COLD void send_Mode_to_Radio(uint8_t mndx)   // Ask the radio what mode it is in
+COLD void send_Mode_to_Radio(uint8_t mndx) 
 {
-CIVresult_t CIVresultL_vfo;
+    CIVresult_t CIVresultL_vfo;
+    uint8_t data_str[6] = {};
 
-    DPRINT("send_Mode_to_Radio: mode index: "); DPRINTLN(mndx);  	
+    //DPRINT("send_Mode_to_Radio: mode index: "); DPRINTLN(mndx);  	
 
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
         DPRINTF("send_Mode_to_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
         mndx = MODES_NUM -3;    // go to start of list
     }
+    
+    if (modeList[mndx].data == 1)  // selected xxx-D modes needs DATA enabled on radio or not
+        radio_data = bandmem[curr_band].data_A = 1;  // set DATA on or off 
+    else 
+        radio_data = bandmem[curr_band].data_A = 0;  // set DATA on or off 
 
-    uint8_t mode_str[4] = {};
-    memcpy(mode_str, CIV_C_MOD_SET, 4);  // copy a template then sub in the mode.
-    mode_str[3] = modeList[mndx].mode_num;  // send the mode values
+    radio_mode = modeList[mndx].mode_num;
+    radio_filter = bandmem[curr_band].filter_A = modeList[mndx].Width;
+    
+    //    bandmem[curr_band].data_A = 1;  // set DATA on or off 
+    
+    memcpy(data_str, CIV_C_MOD_SET, 4);  // copy a template then sub in the mode.
+    data_str[3] = radio_mode;  // send the mode values
+    data_str[4] = radio_data;  // set DATA on or off 
+    data_str[5] = radio_filter;  // Set filter
+    
+    DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("  Data: "); DPRINTLN(radio_data);    
 
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, mode_str, CIV_D_NIX, CIV_wFast);
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+    while (CIVresultL_vfo.retVal > CIV_OK_DAV)
+    {
+        CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+        delay(10);
+    }
+    
     DPRINTF("send_Mode_to_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
+    
     
     if (CIVresultL_vfo.retVal == CIV_OK)
     {
         DPRINT("send_Mode_to_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
         bandmem[curr_band].mode_A = mndx; // get current mode table index
         displayMode();
+        displayFilter();
+        displayDATA();
     }
+    delay(20);
     return;
+}
+
+//  Used to read the Band stack register of choice
+//could be useful to read mode, filter, and other settings for each band on controller startup
+COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radio for band and register contents
+{
+    CIVresult_t CIVresultL_vfo;
+
+    //DPRINTF("read_BSTACK_from_Radio: Band stack band and register contents requested: "); DPRINT(band); DPRINTF(" "); DPRINTLN(reg);
+
+    uint8_t data_str[3] = {};
+    data_str[0] = 2;  // send the mode values
+    data_str[1] = band;  // send the mode values
+    data_str[2] = reg;  // send the mode values
+
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, CIV_C_BSTACK, data_str, CIV_wChk);
+    //DPRINTF("read_BSTACK_from_Radio: retVal of BSTACK writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
+    
+    if (CIVresultL_vfo.retVal == CIV_OK)
+    {
+        //DPRINT("read_BSTACK_from_Radio: Value is "); DPRINTLN(CIVresultL_vfo.value);  	
+        //bandmem[curr_band].mode_A = mndx; // get current mode table index
+        //displayMode();
+        return 0;
+    }
+    return 1;
 }

@@ -865,7 +865,6 @@ void Button_Action(uint16_t button_name)
             case BS_432:    Band(BAND432);  break;
             case BS_902:    Band(BAND902);  break;
             case BS_1296:   Band(BAND1296); break;
-            case BS_2304:   Band(BAND2304); break;
             case BS_2400:   Band(BAND2400); break;
             case BS_3400:   Band(BAND3400); break;
             case BS_5760:   Band(BAND5760); break;

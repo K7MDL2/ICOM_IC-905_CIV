@@ -212,14 +212,15 @@ int32_t     ModeOffset  = 0;        // Holds offset based on CW mode pitch
 uint8_t     default_MF_slot         = 0;    // default MF client assignment slot 
 float       S_Meter_Peak_Avg;              // For RF AGC Limiter
 bool        MeterInUse;  // S-meter flag to block updates while the MF knob has control
-int32_t     Freq_Peak   = 0;
+int32_t     Freq_Peak    = 0;
 uint8_t     display_state;   // something to hold the button state for the display pop-up window later.
 bool        touchBeep_flag          = false;
-uint8_t     popup       = 0;   // experimental flag for pop up windows
-static uint32_t delta = 0;
+uint8_t     popup        = 0;   // experimental flag for pop up windows
+static uint32_t delta    = 0;
 uint8_t lpCnt = 0;
-uint8_t     radio_mode = 0;         // mode from radio messages
-uint8_t     radio_filter = 0;       // filter from radio messages
+uint8_t     radio_mode   = 0;       // mode from radio messages
+uint8_t     radio_filter = 0;     // filter from radio messages
+uint8_t     radio_data   = 0;       //  DATA on/off  from radio messages
 
 // ************************************************* Setup *****************************************
 //
@@ -421,6 +422,17 @@ void setup()
     curr_band = user_settings[user_Profile].last_band; // get last band used from user profile.
     PAN(0);
 
+    // override our defaults with the radio's Bandstack values for each band (3 values per band)
+    // transverter bands will use the bandmem table defaults until the radio sends something in use.
+    for (int i = 1; i <= 6; i++)
+    {
+        for (int j = 1; j <= 3; j++)
+        {
+            if (read_BSTACK_from_Radio(i, j) == 0)  // read band stack reg 1 for 144Mhz to get the mode, filter freq
+                while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
+                    delay(2);
+        }
+    }
     //==================================== Frequency Set ==========================================
     #ifdef PANADAPTER
         VFOA = PANADAPTER_LO;
@@ -508,40 +520,38 @@ void loop()
     //if (CAT_Freq_Check.check() == 1)
     if (1);
     {
-      uint64_t VFOA_temp = VFOA;
-      uint8_t ret_val = 0;
-      
-      ret_val = check_CIV(time_current_baseloop);  // got frequency
+        uint64_t VFOA_temp = VFOA;
+        uint8_t ret_val = 0;
+        
+        ret_val = check_CIV(time_current_baseloop);  // got frequency
 
-      if (ret_val == 1) // got frequency
-      {
-        if(VFOA_temp != VFOA)  // Update display if changed
+        if (ret_val == 1) // got frequency
         {
-          VFOA_temp = VFOA;
-          if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands is VFO is in the current band
-            changeBands(0);  // new band
-          displayFreq();   // Update screen
+            if(VFOA_temp != VFOA)  // Update display if changed
+            {
+            VFOA_temp = VFOA;
+            if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands is VFO is in the current band
+                changeBands(0);  // new band
+            displayFreq();   // Update screen
+            }
         }
-      }
-      
-      if (ret_val == 2)  // got modulation mode
-      {
-        for (uint8_t i = 0; i < MODES_NUM; i++)
+        
+        if (ret_val == 2 || ret_val == 4)  // got modulation mode
         {
-          if (modeList[i].mode_num == hexToDec(radio_mode))
-          {
-              DPRINTF("Loop: Mode index = "); DPRINTLN(i); 
-              set_Mode_from_Radio(i);
-              DPRINTF("Loop: Mode = "); DPRINT(radio_mode); 
-              DPRINTF(" Filter = "); DPRINTLN(radio_filter);  
-          }
+            if (ret_val == 2)
+            {
+                DPRINTF("Loop: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
+            }
+            else if (ret_val == 4)
+            {
+                set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
+                DPRINTF("Loop: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
+            }
         }
-      }
     }
 
     //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
     pass_CAT_msgs_to_RADIO();  // if a PC is connected pass on CAT commands to the RADIO transparently.   At this point no collision handling performed.
-    
 
     show_CIV_log();
 
@@ -1142,7 +1152,6 @@ void init_band_map(void)
     (ENABLE_432_BAND  == 1)? enable_band(BS_432,  1): enable_band(BS_432,  0);
     (ENABLE_902_BAND  == 1)? enable_band(BS_902,  1): enable_band(BS_902,  0);
     (ENABLE_1296_BAND == 1)? enable_band(BS_1296, 1): enable_band(BS_1296, 0);
-    (ENABLE_2304_BAND == 1)? enable_band(BS_2304, 1): enable_band(BS_2304, 0);
     (ENABLE_2400_BAND == 1)? enable_band(BS_2400, 1): enable_band(BS_2400, 0);
     (ENABLE_3400_BAND == 1)? enable_band(BS_3400, 1): enable_band(BS_3400, 0);
     (ENABLE_5760_BAND == 1)? enable_band(BS_5760, 1): enable_band(BS_5760, 0);
@@ -1289,10 +1298,7 @@ COLD void MF_Service(int8_t counts, uint8_t knob)
                             Zoom(counts);           break;
         case FILTER_BTN:    if (counts > 0) counts =  1;         // The controls here and below are not yet MF aware
                             if (counts < 0) counts = -1;
-                            if (VARIABLE_FILTER) 
-                                {Variable_Filter(counts);break;}
-                            else 
-                                {Filter(counts);    break;}
+                            {Filter(counts);        break;}
 		case RATE_BTN:      if (counts > 0) counts =  1;
                             if (counts < 0) counts = -1;
                             Rate(counts);           break;

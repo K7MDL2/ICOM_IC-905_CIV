@@ -251,15 +251,12 @@ COLD void displayFilter(void)
 		extern int16_t filterWidth;
 		sprintf(str, "F: %dHz", filterWidth);	
 	#else
-		if (bandmem[curr_band].mode_A == FM)
-			sprintf(str, "F: N/A");  // FM is fixed wide
-		else
-			sprintf(str, "F:%s%s", filter[bandmem[curr_band].filter].Filter_name,filter[bandmem[curr_band].filter].units);	
+		sprintf(str, "F:%s", filter[bandmem[curr_band].filter_A].Filter_name);	
 	#endif
 	//DPRINTF("Filter is "); DPRINTLN(str);
 	sprintf(labels[FILTER_LBL].label, "%s", str);
-	drawLabel(FILTER_LBL, &bandmem[curr_band].filter);
-	draw_2_state_Button(FILTER_BTN, &bandmem[curr_band].filter);
+	drawLabel(FILTER_LBL, &bandmem[curr_band].filter_A);
+	draw_2_state_Button(FILTER_BTN, &bandmem[curr_band].filter_A);
 }
 
 COLD void displayVarFilter(void)
@@ -738,7 +735,13 @@ COLD void displayBandDn()	{if (popup) return; draw_2_state_Button(BANDDN_BTN, &b
 COLD void displayDisplay()	{if (popup) return; draw_2_state_Button(DISPLAY_BTN, &display_state);						 }
 COLD void displayMute()		{if (popup) return; draw_2_state_Button(MUTE_BTN, &user_settings[user_Profile].mute);		 }
 COLD void displayEnet()		{if (popup) return; draw_2_state_Button(ENET_BTN, &user_settings[user_Profile].enet_output); }
-COLD void displayClip()		{if (popup) return;	drawLabel(CLIP_LBL, &labels[CLIP_LBL].enabled); 						 }
+
+COLD void displayDATA()
+{
+	if (popup) return;	
+	labels[DATA_LBL].enabled = bandmem[curr_band].data_A;  // update database
+	drawLabel(DATA_LBL, &labels[DATA_LBL].enabled); 					     
+}
 
 //
 //------------------------------------  drawButton ------------------------------------------------------------------------
@@ -882,7 +885,8 @@ COLD void displayRefresh(void)
 	displayFn();   // make fn=1 to call displayFn() to prevent calling itself
     displayFreq();    // display frequency
 	displayTime();
-	displayClip();
+	//displayClip();
+	displayDATA();
 	//displayMeter();
 	// Panel 1 buttons
 	displayMode();

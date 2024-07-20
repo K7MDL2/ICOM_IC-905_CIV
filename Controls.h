@@ -33,7 +33,6 @@ void Rate(int8_t dir);
 void setMode(int8_t dir);
 void AGC(int8_t dir);
 void Filter(int8_t dir);
-void Variable_Filter(int8_t dir);
 void ATU(uint8_t state);
 void Split(uint8_t state);
 void setXIT(int8_t toggle);
@@ -63,6 +62,7 @@ uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band);
 void clearMeter(void);
 void send_Mode_to_Radio(uint8_t mndx);
 void set_Mode_from_Radio(uint8_t mndx);
-uint8_t get_Mode_from_Radio(void); 
+uint8_t get_Mode_from_Radio(void);
+uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg);   // Ask the radio for band and register contents 
 
 #endif  // _CONTROLS_H_

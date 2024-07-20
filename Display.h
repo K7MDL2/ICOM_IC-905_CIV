@@ -63,7 +63,7 @@ void pop_win_up(uint8_t win_num);
 void pop_win_down(uint8_t win_num);
 
 void update_icon_outline(void);
-void displayClip(void);
+void displayDATA(void);
 
 //void displaySpot();  // spare
 

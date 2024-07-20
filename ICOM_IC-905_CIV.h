@@ -202,16 +202,15 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define BAND432      13 // 432
 #define BAND902      14 // 902
 #define BAND1296     15 // 1296
-#define BAND2304     16 // 2304
-#define BAND2400     17 // 2400
-#define BAND3400     18 // 3400
-#define BAND5760     19 // 5760M
-#define BAND10G      20 // 10.368.1G
-#define BAND24G      21 // 24.192G
-#define BAND47G      22 // 47.1G
-#define BAND76G      23 // 76.1G
-#define BAND122G     24 // 122G
-#define PAN_ADAPT    25 // Panadapter IF band
+#define BAND2400     16 // 2400
+#define BAND3400     17 // 3400
+#define BAND5760     18 // 5760M
+#define BAND10G      19 // 10.368.1G
+#define BAND24G      20 // 24.192G
+#define BAND47G      21 // 47.1G
+#define BAND76G      22 // 76.1G
+#define BAND122G     23 // 122G
+#define PAN_ADAPT    24 // Panadapter IF band
 
 // Zoom level for UI control
 #define ZOOMx1      0       // Zoom out the most (fft1024 @ 48K) (aka OFF)  x1 reference
@@ -226,14 +225,20 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 //  buttons and indicator colors, button an label locations and more. 
 //  Pretty much every global variable that controls a setting is here in a table of some sort. 
 //
-#define CW          0
-#define CW_REV      1
-#define USB         2
-#define LSB         3     
-#define DATA        4
-#define DATA_REV    5
-#define AM          6
-#define FM          7
+#define CW          3
+#define CW_R        7
+#define USB         1
+#define LSB         0     
+#define RTTY        4     
+#define RTTY_R      8     
+#define AM          2
+#define FM          5
+#define DV          23
+#define DD          34
+#define ATV         35
+
+#define DATA_OFF    0
+#define DATA_ON     1
 
 #define ON          1
 #define OFF         0
@@ -300,12 +305,12 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define NTCH2       2
 
 // This group defines the number of records in each structure
-#define MODES_NUM   11
+#define MODES_NUM   15
 #define FREQ_DISP_NUM  4
-#define BANDS       26
+#define BANDS       25
 #define XVTRS       15
 #define TS_STEPS    6
-#define FILTER      10
+#define FILTER      4
 #define AGC_SET_NUM 4
 #define NB_SET_NUM  7
 #define USER_SETTINGS_NUM 3
@@ -317,9 +322,9 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define GPIO_SW     3
 #define NONE        0
 #ifdef USE_RA8875
-#define STD_BTN_NUM 60      // number of rows in the buttons table
+#define STD_BTN_NUM 59      // number of rows in the buttons table
 #else
-#define STD_BTN_NUM 60      // number of rows in the buttons table
+#define STD_BTN_NUM 59      // number of rows in the buttons table
 #endif
 // Alternative to #define XXX_BTN is use "const int XXX_BTN" or enum to create index names to the table.
 // enum Button_List {FN_BTN, MODE_BTN, FILTER_BTN, ATTEN_BTN, PREAMP_BTN, };
@@ -397,15 +402,14 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define BS_432      48 // 432
 #define BS_902      49 // 902
 #define BS_1296     50 // 1296
-#define BS_2304     51 // 2304
-#define BS_2400     52 // 2400
-#define BS_3400     53 // 3400
-#define BS_5760     54 // 5760M
-#define BS_10G      55 // 10.368.1G
-#define BS_24G      56 // 24.192G
-#define BS_47G      57 // 47.1G
-#define BS_76G      58 // 76.1G
-#define BS_122G     59 // 122G
+#define BS_2400     51 // 2400
+#define BS_3400     52 // 3400
+#define BS_5760     53 // 5760M
+#define BS_10G      54 // 10.368.1G
+#define BS_24G      55 // 24.192G
+#define BS_47G      56 // 47.1G
+#define BS_76G      57 // 76.1G
+#define BS_122G     58 // 122G
 
 
 // The #define button numbers act as the ID of possible owners of MF knob services
@@ -419,14 +423,20 @@ struct Band_Memory {
     uint64_t    edge_lower;     // band edge limits for TX and for when to change to next band when tuning up or down.
     uint64_t    edge_upper;
     uint64_t    vfo_A_last;     // remember last VFO dial setting in this band
-    uint8_t     mode_A;         // CW, LSB, USB, DATA.  
+    uint8_t     mode_A;         // CW, LSB, USB, etc
+    uint8_t     filter_A;       // 1, 2 or 3 for Icoms
+    uint8_t     data_A;         // LSB, USB, AM, FM modes can have DATA mode on or off.  All other radio modes data is NA.
     uint64_t    vfo_A_last_1;   // remember previous VFO dial setting in this band (bandstack)
-    uint8_t     mode_A_1;
+    uint8_t     mode_A_1;       // CW, LSB, USB, etc
+    uint8_t     filter_A_1;     // 1, 2 or 3 for Icoms  
+    uint8_t     data_A_1;       // LSB, USB, AM, FM modes can have DATA mode on or off.  All other radio modes data is NA.
     uint64_t    vfo_A_last_2;   // remember previous VFO dial setting in this band (bandstack)
-    uint8_t     mode_A_2;
+    uint8_t     mode_A_2;       // CW, LSB, USB, etc
+    uint8_t     filter_A_2;     // 1, 2 or 3 for Icoms
+    uint8_t     data_A_2;       // LSB, USB, AM, FM modes can have DATA mode on or off.  All other radio modes data is NA.
     uint64_t    vfo_B_last;     // moving away from per-band VFOB recall, moving to use a global sub-VFO which can be on any band.
     uint8_t     mode_B;         // CW, LSB, USB, DATA. - Depricating in favor is global Sub_VFO mode in user_settings 
-    uint8_t     filter;         // index to Bandwidth selection for this band.
+    uint8_t     filter;         // index to Bandwidth selection for this band. (depricating for 905)
     uint16_t    var_filter;     // Continuously variable filter setting in Hz.
     uint8_t     band_num;       // generally the same as the index but could be used to sort bands differently and skip bands
     uint8_t     tune_step;      // last step rate on this band.  Index to Tune step table 
@@ -575,9 +585,6 @@ struct Zoom_Lvl {
 
 struct Filter_Settings {
     char        Filter_name[12];   // display name for UI
-    uint16_t    Width;             // bandwidth in HZ
-    char        units[4];
-    uint8_t     filter_type;       // preferred mode when enabled (future use)
 };
 
 struct TuneSteps {
@@ -590,10 +597,11 @@ struct TuneSteps {
 struct Modes_List {
     uint8_t     mode_num;
     char        mode_label[8];
-    uint16_t    Width;             // bandwidth in HZ - look up matching width in Filter table when changing modes
+    uint8_t     Width;             // bandwidth in HZ - look up matching width in Filter table when changing modes
+    uint8_t     data;
 };
 
-enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATTEN_LBL, PREAMP_LBL, ATU_LBL, RIT_LBL, XIT_LBL, FINE_LBL, NB_LBL, NR_LBL, NOTCH_LBL, SPLIT_LBL, MUTE_LBL, XMIT_LBL, XVTR_LBL, REFLVL_LBL, SPOT_LBL, ZOOM_LBL, PAN_LBL, CLIP_LBL};
+enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATTEN_LBL, PREAMP_LBL, ATU_LBL, RIT_LBL, XIT_LBL, FINE_LBL, NB_LBL, NR_LBL, NOTCH_LBL, SPLIT_LBL, MUTE_LBL, XMIT_LBL, XVTR_LBL, REFLVL_LBL, SPOT_LBL, ZOOM_LBL, PAN_LBL, DATA_LBL};
 /*
 #define BAND_LBL    0       // Band label (if used)
 #define MODE_LBL    1       // index to button
@@ -618,7 +626,7 @@ enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATT
 #define SPOT_LBL    20      // not implemented yet
 #define ZOOM_LBL    21      // not implemented yet
 #define PAN_LBL     22      // not implemented yet
-#define CLIP_LBL    23      // Cliping warning fopr the screen, initially from RS-HFIQ.
+#define DATA_LBL    23      // Radio current mode has DATA ON or OFF
 */
 
 // This stores type and status info for auxillary encoders (VFO is separate).  
@@ -704,6 +712,10 @@ const String modModeStr[MODES_NUM+1] = {
   "DV    ", // 09 (Note: on the ICOM CIV bus, this is coded as 17 in BCD-code, i.e. 0x17)
   "DD    ",
   "ATV   ",
+  "LSB-D ",
+  "USB-D ",
+  "AM-D  ",
+  "FM-D  ",
   "NDEF  "  // 10
 };
 
