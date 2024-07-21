@@ -19,9 +19,11 @@ extern uint64_t VFOB;
 extern uint8_t radio_mode;         // mode from radio messages
 extern uint8_t radio_filter;       // filter from radio messages
 extern uint8_t radio_data;       // filter from radio messages
+extern uint8_t user_Profile;
 extern struct Band_Memory bandmem[];
 extern struct Modes_List modeList[];
 extern struct Filter_Settings filter[];
+extern struct User_Settings user_settings[];
 extern unsigned int hexToDec(String hexString);
 
 uint64_t freq = 0;
@@ -111,119 +113,211 @@ uint8_t check_CIV(uint32_t time_current_baseloop) {
   	if (CIVresultL.retVal <= CIV_NOK) {  // valid answer received !
     if (CIVresultL.retVal == CIV_OK_DAV) {  // Data available
 		// Check for Frequency message type
-		if ((CIVresultL.cmd[1] == CIV_C_F_READ[1]) ||  // command CIV_C_F_READ received
-			(CIVresultL.cmd[1] == CIV_C_F_SEND[1])) 
-		{  // command CIV_C_F_SEND received
-			DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
-			VFOA = (uint64_t)CIVresultL.value;
-			msg_type = 1;
-			freqReceived = true;
-		}
 
-		// Test for MODE change
-		if ((CIVresultL.cmd[1] == CIV_C_MOD_READ[1]) ||  // command CIV_C_MODE_SEND received
-			(CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ) 
-		{  // command CIV_C_MODE_READ received
-			radio_mode = hexToDec(CIVresultL.value/100);
-			radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
-			get_Mode_from_Radio();
-			DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Filter: "); DPRINTLN(filter[radio_filter].Filter_name);    
-			msg_type = 2;
-			freqReceived = false;
-		}  // Mode changed
-
-		// Test for extended MODE change
-		if ((CIVresultL.cmd[1] == CIV_C_F26_READ[1]) ||
-			(CIVresultL.cmd[1] == CIV_C_F26_SEND[1]) ) 
-		{
-			// [0]=x is length, [1]== 0 is selected VFO
-			radio_mode   = CIVresultL.datafield[2];  // mode
-			radio_data   = bandmem[curr_band].data_A   = CIVresultL.datafield[3];  // data on/off
-			radio_filter = bandmem[curr_band].filter_A = CIVresultL.datafield[4];  // filter setting
-
-			for (uint8_t i = 0; i< MODES_NUM; i++)
+		//for (uint8_t i = 0; i <= CIVresultL.cmd[0], i++)
+		//	uint8_t tok1 = ;
+		
+		if (int tok = memcmp(&CIVresultL.cmd[1], &CIV_C_F_READ[1], CIVresultL.cmd[0]))
 			{
-				if (modeList[i].mode_num == radio_mode && modeList[i].data == radio_data)
-					radio_mode = bandmem[curr_band].mode_A = i;   // convert to our own mode list to show -D (or not)
+				DPRINTF(""); DPRINTLN("  match");
 			}
-			modeList[radio_mode].Width = radio_filter;  // store filter in mode table using the extended mode value (-D or no -D)
-			DPRINTF("check_CIV: CI-V Returned Extended Mode: "); DPRINT(modeList[radio_mode].mode_label); DPRINT("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINT("  Data: "); DPRINTLN(radio_data);  
-			msg_type = 4;
-			freqReceived = false;
-		}  // Mode changed
-	
-		// Test for Bstack message
-		if (CIVresultL.cmd[1] == CIV_C_BSTACK[1]) 
-		{
-			// returned mnessage is 1A 01 band code, reg code, freq, mode, data on/off
-			// receive fields 6 to 52 on p18 of prog guide
-			// 6-10 freq or 6-12 for 10GHz+
-			// +2 Mode
-			// +1 Data mode on/off
-			// can ignore the rest - appies to Rptrs and DigV modes
-			uint16_t bstack_band  = CIVresultL.datafield[1];  // byte 0 is the datafield length
-			uint16_t bstack_reg   = CIVresultL.datafield[2];
-
-			DPRINTF("check_CIV: CI-V Returned Bstack Band: "); DPRINT(bstack_band); DPRINTF("  Register: "); DPRINT(bstack_reg);
-				
-			uint8_t F_len = 6;	// 6 bytes for IC905
-			uint8_t idx = 0;
-			uint8_t DstartIdx = 3;  // start of freq for 12 bytes
-			uint8_t DstopIdx = DstartIdx + F_len;  // start of mode, filter data on/off will be 1-3 bytes after
-			uint8_t rxBuffer[F_len];  // hold 6 bytes of frequency
-			uint64_t mul = 1;
-			uint64_t bstack_freq = 0;
-			uint8_t band = 0;  // temp storage for radio bstack band code to remote bandmem table band index
-
-			for (idx = DstartIdx; idx < DstopIdx; idx++)           // pull out frequency from datafield result
-				rxBuffer[idx-DstartIdx] = CIVresultL.datafield[idx];
-
-			// 6 byte data -> first byte is of lowest order - for 905 10G and up bands
-			for (idx = 0; idx < F_len; idx++) {
-				bstack_freq += (rxBuffer[idx] & 0x0f) * mul; mul *= 10;
-				bstack_freq += (rxBuffer[idx] >> 4) * mul; mul *= 10;
-			}
-			DPRINTF("  Frequency: "); DPRINT(bstack_freq);
 			
-			radio_mode = CIVresultL.datafield[DstopIdx];  // modulation mode
-			radio_filter = CIVresultL.datafield[DstopIdx+1];  // filter 
-			radio_data = CIVresultL.datafield[DstopIdx+2];  // data mode on or off
-			DPRINTF("  Mode: "); DPRINT(radio_mode, HEX); DPRINT("  Filter: ");DPRINT(radio_filter, HEX);  DPRINT("  Data: ");DPRINTLN(radio_data, HEX);   
 
-			// convert radio bstack band code to remote bandmem table band index
-			switch (bstack_band)
-			{
-				case 1: band = BAND144; break;
-				case 2: band = BAND432; break;
-				case 3: band = BAND1296; break;
-				case 4: band = BAND2400; break;
-				case 5: band = BAND5760; break;
-				case 6: band = BAND10G; break;
-				default: band = BAND144; break;
+		switch (CIVresultL.cmd[1]) {
+			
+			case CIV_C_F_READ[1]:
+			case CIV_C_F_SEND[1]:
+			//if ((CIVresultL.cmd[1] == CIV_C_F_READ[1]) ||  // command CIV_C_F_READ received
+			//	(CIVresultL.cmd[1] == CIV_C_F_SEND[1])) 
+			{  // command CIV_C_F_SEND received
+				DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
+				VFOA = (uint64_t)CIVresultL.value;
+				msg_type = 1;
+				freqReceived = true;
+				break;
 			}
 
-			switch (bstack_reg)
+			case CIV_C_MOD_READ[1]:
+			case CIV_C_MOD_SEND[1]:
+			// Test for MODE change
+			//if ((CIVresultL.cmd[1] == CIV_C_MOD_READ[1]) ||  // command CIV_C_MODE_SEND received
+			//	(CIVresultL.cmd[1] == CIV_C_MOD_SEND[1]) ) 
+			{  // command CIV_C_MODE_READ received
+				radio_mode = hexToDec(CIVresultL.value/100);
+				radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
+				get_Mode_from_Radio();
+				DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Filter: "); DPRINTLN(filter[radio_filter].Filter_name);    
+				msg_type = 2;
+				freqReceived = false;
+				break;
+			}  // Mode changed
+
+			case CIV_C_F26_READ[1]:
+			//case CIV_C_F26_SEND[1]:
+			// Test for extended MODE change
+			//if ((CIVresultL.cmd[1] == CIV_C_F26_READ[1]) ||
+			//	(CIVresultL.cmd[1] == CIV_C_F26_SEND[1]) ) 
 			{
-				case 1: bandmem[band].vfo_A_last   = bstack_freq; 
-						bandmem[band].mode_A = radio_mode;
-						bandmem[band].filter_A = radio_filter;
-						bandmem[band].data_A = radio_data; 		// LSB, USB, AM, FM modes can have DATa mode on or off.  All other radio modes data is NA.
-						break;
-				case 2: bandmem[band].vfo_A_last_1 = bstack_freq; 
-						bandmem[band].mode_A_1 = radio_mode; 
-						bandmem[band].filter_A_1 = radio_filter;
-						bandmem[band].data_A_2 = radio_data;
-						break;
-				case 3: bandmem[band].vfo_A_last_2 = bstack_freq; 
-						bandmem[band].mode_A_2 = radio_mode;
-						bandmem[band].filter_A_2 = radio_filter; 
-						bandmem[band].data_A_2 = radio_data;
-						break;
+				// [0]=x is length, [1]== 0 is selected VFO
+				radio_mode   = CIVresultL.datafield[2];  // mode
+				radio_data   = bandmem[curr_band].data_A   = CIVresultL.datafield[3];  // data on/off
+				radio_filter = bandmem[curr_band].filter_A = CIVresultL.datafield[4];  // filter setting
+
+				for (uint8_t i = 0; i< MODES_NUM; i++)
+				{
+					if (modeList[i].mode_num == radio_mode && modeList[i].data == radio_data)
+						radio_mode = bandmem[curr_band].mode_A = i;   // convert to our own mode list to show -D (or not)
+				}
+				modeList[radio_mode].Width = radio_filter;  // store filter in mode table using the extended mode value (-D or no -D)
+				DPRINTF("check_CIV: CI-V Returned Extended Mode: "); DPRINT(modeList[radio_mode].mode_label); DPRINT("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINT("  Data: "); DPRINTLN(radio_data);  
+				msg_type = 4;
+				freqReceived = false;
+				break;
+			}  // Mode changed
+
+			// Test for Bstack message
+			case CIV_C_BSTACK[1]:
+			//if (CIVresultL.cmd[1] == CIV_C_BSTACK[1]) 
+			{
+				// returned mnessage is 1A 01 band code, reg code, freq, mode, data on/off
+				// receive fields 6 to 52 on p18 of prog guide
+				// 6-10 freq or 6-12 for 10GHz+
+				// +2 Mode
+				// +1 Data mode on/off
+				// can ignore the rest - appies to Rptrs and DigV modes
+				uint16_t bstack_band  = CIVresultL.datafield[1];  // byte 0 is the datafield length
+				uint16_t bstack_reg   = CIVresultL.datafield[2];
+
+				DPRINTF("check_CIV: CI-V Returned Band Stack - Band: "); DPRINT(bstack_band); DPRINTF("  Register: "); DPRINT(bstack_reg);
+					
+				uint8_t F_len = 6;	// 6 bytes for IC905
+				uint8_t idx = 0;
+				uint8_t DstartIdx = 3;  // start of freq for 12 bytes
+				uint8_t DstopIdx = DstartIdx + F_len;  // start of mode, filter data on/off will be 1-3 bytes after
+				uint8_t rxBuffer[F_len];  // hold 6 bytes of frequency
+				uint64_t mul = 1;
+				uint64_t bstack_freq = 0;
+				uint8_t band = 0;  // temp storage for radio bstack band code to remote bandmem table band index
+
+				for (idx = DstartIdx; idx < DstopIdx; idx++)           // pull out frequency from datafield result
+					rxBuffer[idx-DstartIdx] = CIVresultL.datafield[idx];
+
+				// 6 byte data -> first byte is of lowest order - for 905 10G and up bands
+				for (idx = 0; idx < F_len; idx++) {
+					bstack_freq += (rxBuffer[idx] & 0x0f) * mul; mul *= 10;
+					bstack_freq += (rxBuffer[idx] >> 4) * mul; mul *= 10;
+				}
+				DPRINTF("  Frequency: "); DPRINT(bstack_freq);
+				
+				radio_mode = CIVresultL.datafield[DstopIdx];  // modulation mode
+				radio_filter = CIVresultL.datafield[DstopIdx+1];  // filter 
+				radio_data = CIVresultL.datafield[DstopIdx+2];  // data mode on or off
+				DPRINTF("  Mode: "); DPRINT(radio_mode, HEX); DPRINT("  Filter: ");DPRINT(radio_filter, HEX);  DPRINT("  Data: ");DPRINTLN(radio_data, HEX);   
+
+				// convert radio bstack band code to remote bandmem table band index
+				switch (bstack_band)
+				{
+					case 1: band = BAND144; break;
+					case 2: band = BAND432; break;
+					case 3: band = BAND1296; break;
+					case 4: band = BAND2400; break;
+					case 5: band = BAND5760; break;
+					case 6: band = BAND10G; break;
+					default: band = BAND144; break;
+				}
+
+				switch (bstack_reg)
+				{
+					case 1: bandmem[band].vfo_A_last   = bstack_freq; 
+							bandmem[band].mode_A = radio_mode;
+							bandmem[band].filter_A = radio_filter;
+							bandmem[band].data_A = radio_data; 		// LSB, USB, AM, FM modes can have DATa mode on or off.  All other radio modes data is NA.
+							break;
+					case 2: bandmem[band].vfo_A_last_1 = bstack_freq; 
+							bandmem[band].mode_A_1 = radio_mode; 
+							bandmem[band].filter_A_1 = radio_filter;
+							bandmem[band].data_A_2 = radio_data;
+							break;
+					case 3: bandmem[band].vfo_A_last_2 = bstack_freq; 
+							bandmem[band].mode_A_2 = radio_mode;
+							bandmem[band].filter_A_2 = radio_filter; 
+							bandmem[band].data_A_2 = radio_data;
+							break;
+				}
+				msg_type = 3;
+				freqReceived = false;
+				break;
 			}
 
-          	msg_type = 3;
-          	freqReceived = false;
-      	}
+			// Test for MY_POSITION response
+			// Be sure to give long response time before another command or this long answer will be cut short
+			case CIV_C_MY_POSIT_READ[1]:
+			//if (CIVresultL.cmd[1] == CIV_C_MY_POSIT_READ[1]) 
+			{
+				//uint8_t RX = CIVresultL.value;
+				//get_Mode_from_Radio();s
+				//DPRINTF("check_CIV: CI-V Returned MY POSITION and TIME: "); DPRINTLN(retValStr[CIVresultL.value]);
+				//               pos      1             2  3  4  5  6    7  8  9 10 11 12   13 14 15 16   17 18   19 20 21   22 23  24  25  26 27 28 term
+				// FE.FE.E0.AC.  23.00.  datalen byte  47.46.92.50.01.  01.22.01.98.70.00.  00.15.59.00.  01.05.  00.00.07.  20.24. 07. 20. 23.32.45. FD
+				//                                     47.46.925001 lat 122.01.987000 long  155.900m alt  105deg   0.7km/h   2024   07  20  23:32:45 UTC
+				// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 27 is 28 here.
+				DPRINTF("** Time from Radio is: ");
+				int _hr = bcdByte(CIVresultL.datafield[26]); DPRINT(_hr); DPRINTF(":");
+				int _min = bcdByte(CIVresultL.datafield[27]); DPRINT(_min);DPRINTF(":");
+				int _sec = bcdByte(CIVresultL.datafield[28]); DPRINT(_sec);DPRINTF(" ");
+				
+				int _month = bcdByte(CIVresultL.datafield[24]); DPRINT(_month);DPRINTF(".");
+				int _day = bcdByte(CIVresultL.datafield[25]); DPRINT(_day); DPRINTF(".");
+				int _yr = bcdByte(CIVresultL.datafield[23]); DPRINTLN(_yr); // yr can be 4 or 2 digits  2024 or 24
+							
+				setTime(_hr,_min,_sec,_day,_month,_yr);
+				
+				msg_type = 6;
+				freqReceived = false;
+				break;
+			}  // MY Position 
+			
+			// Test for UTC OFFSET 
+			// Be sure to give long response time before another command or this long answer will be cut short
+			case CIV_C_UTC_READ[2]:
+			//if (CIVresultL.cmd[1] == CIV_C_UTC_READ[1]) 
+			{
+				//               pos      1             2  3                          4   term
+				// FE.FE.E0.AC.  1A.05.  datalen byte  47.46.                        92.  FD
+				//                                     offset time 00 00 to 14 00    Shift dir 00 + and 01 is -
+				// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
+
+				uint8_t hr_off = bcdByte(CIVresultL.datafield[2]); 
+				int min_off = bcdByte(CIVresultL.datafield[3]); 
+				int shift_dir = bcdByte(CIVresultL.datafield[4]);
+				
+				DPRINTF("check_CIV: CI-V Returned UTC Offset: "); 
+				if (shift_dir) 
+					DPRINT("-");
+				DPRINT(hr_off); DPRINTF(":");DPRINTLN(min_off);
+
+				//get current time and correct or set time zone offset
+				//setTime(_hr,_min,_sec,_day,_month,_yr);
+				
+				msg_type = 7;
+				freqReceived = false;
+				break;
+			}  // UTC Offset
+			
+			// Test for  TX-RX change
+			case CIV_C_TX[1]:	
+			{
+				uint8_t RX = CIVresultL.value;
+				//get_Mode_from_Radio();
+				DPRINTF("check_CIV: CI-V Returned RX-TX status: "); DPRINTLN(RX);
+				if (RX == 1)
+					user_settings[user_Profile].xmit = 1;
+				if (RX == 0)
+					user_settings[user_Profile].xmit = 0;
+				msg_type = 5;
+				freqReceived = false;
+			}  // RX TX  changed
+		}  // end switch
 		return msg_type;
     }  // Data available
 
