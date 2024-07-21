@@ -433,6 +433,7 @@ void setup()
                     delay(2);
         }
     }
+
     //==================================== Frequency Set ==========================================
     #ifdef PANADAPTER
         VFOA = PANADAPTER_LO;
@@ -476,6 +477,8 @@ void setup()
 
     update_icon_outline(); // update any icons related to active encoders functions  This also calls displayRefresh.
     // displayRefresh();
+
+    get_MY_POSITION_from_Radio();
 }
 
 void loop()
@@ -548,6 +551,19 @@ void loop()
                 DPRINTF("Loop: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
             }
         }
+
+        if (ret_val == 5)  // RX TX status received
+        {
+            DPRINTF("Loop: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
+            displayXMIT();
+        }
+
+        if (ret_val == 6 || ret_val == 7)  // RX TX status received
+        {
+            DPRINTF("Loop: TIME = "); DPRINTLN("time XXXXX");
+            displayTime();
+        }
+
     }
 
     //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.

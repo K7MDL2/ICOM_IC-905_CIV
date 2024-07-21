@@ -64,5 +64,7 @@ void send_Mode_to_Radio(uint8_t mndx);
 void set_Mode_from_Radio(uint8_t mndx);
 uint8_t get_Mode_from_Radio(void);
 uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg);   // Ask the radio for band and register contents 
+uint8_t get_MY_POSITION_from_Radio(void);
+uint8_t get_RXTX_from_Radio(void);
 
 #endif  // _CONTROLS_H_

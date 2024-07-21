@@ -1969,3 +1969,31 @@ COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radi
     }
     return 1;
 }
+
+// Used to request RX TX status from radio
+COLD uint8_t get_RXTX_from_Radio(void)   // Change Mode of the current active VFO by increment delta.
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_TX, CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
+    return CIVresultL.value;
+}
+
+// Used to request position adn time from radio
+COLD uint8_t get_MY_POSITION_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_UTC, CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_MY_POSITION_from_Radio: retVal of UTC Offset: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(2);
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_MY_POSIT_READ, CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_MY_POSITION_from_Radio: retVal of MY POS: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(2);
+
+    return CIVresultL.value;
+}
+
+
