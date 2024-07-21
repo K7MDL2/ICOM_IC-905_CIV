@@ -621,7 +621,7 @@ COLD void displayTime(void)
 {
 	//if (popup) return;  // Do not write to the screen when a window is active
 
-	#ifdef ENET
+	#if defined ENET || UTC == 1
 	sprintf(std_btn[UTCTIME_BTN].label, "UTC:%02d:%02d:%02d", hour(), minute(), second());
 	#else
 	sprintf(std_btn[UTCTIME_BTN].label, "Local:%02d:%02d:%02d", hour(), minute(), second());
