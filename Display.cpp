@@ -402,16 +402,16 @@ COLD void displayAttn()
 			sprintf(std_btn[ATTEN_BTN].label, "  %s", string);
 	#else
 		snprintf(string, 10, "ATT:%3d", bandmem[curr_band].attenuator_dB);
-		snprintf(std_btn[ATTEN_BTN].label, 10, "%3s", string);
+		snprintf(std_btn[ATTN_BTN].label, 10, "%3s", string);
 	#endif
-	snprintf(labels[ATTEN_LBL].label, 10, "%3s", string);
+	snprintf(labels[ATTN_LBL].label, 10, "%3s", string);
 	
-	//DPRINTF("displayAttn: Atten is "); DPRINT(bandmem[curr_band].attenuator); DPRINTF(" Level is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
+	//DPRINTF("displayAttn: Attn is "); DPRINT(bandmem[curr_band].attenuator); DPRINTF(" Level is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
 	
-	drawLabel(ATTEN_LBL, &bandmem[curr_band].attenuator_byp);
-	draw_2_state_Button(ATTEN_BTN, &bandmem[curr_band].attenuator_byp);
+	drawLabel(ATTN_LBL, &bandmem[curr_band].attenuator_byp);
+	draw_2_state_Button(ATTN_BTN, &bandmem[curr_band].attenuator_byp);
 
-	if (MF_client == ATTEN_BTN) 
+	if (MF_client == ATTN_BTN) 
 	{ 
         MeterInUse = true;
     	displayMeter(bandmem[curr_band].attenuator_dB/10, string, 5);   // val, string label, color scheme               

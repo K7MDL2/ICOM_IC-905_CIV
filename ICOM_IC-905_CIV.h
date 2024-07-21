@@ -246,8 +246,8 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define ANT1        1
 #define ANT2        2
 #define ANT3        3
-#define ATTEN_OFF   0       // Bypass
-#define ATTEN_ON    1       // Turn relay on
+#define ATTN_OFF   0       // Bypass
+#define ATTN_ON    1       // Turn relay on
 #define PREAMP_OFF  0       // Bypass
 #define PREAMP_ON   1       // Switch relay on
 #define XVTR1       0       // Transverter band Slot ID
@@ -327,7 +327,7 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define STD_BTN_NUM 59      // number of rows in the buttons table
 #endif
 // Alternative to #define XXX_BTN is use "const int XXX_BTN" or enum to create index names to the table.
-// enum Button_List {FN_BTN, MODE_BTN, FILTER_BTN, ATTEN_BTN, PREAMP_BTN, };
+// enum Button_List {FN_BTN, MODE_BTN, FILTER_BTN, ATTN_BTN, PREAMP_BTN, };
 // using #define method as it is easiet to relate the purpose and more obvious which row it is mapped to.
 #define PANEL_ROWS  7       // Set Number of panels + 2.  0 is disable, 1 is not used.
                             // numbers 2 and up are the panel index number (panel number -2) for the panel to display.
@@ -338,7 +338,7 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define MODE_BTN    1       // index to button
 #define FILTER_BTN  2       // will display the current FILTER value in the button
 #define RATE_BTN    3       // will display the RATE (step) value in the button
-#define ATTEN_BTN   4       // invoke a pop up (ON) for atten slider or MF knob adjustment
+#define ATTN_BTN   4       // invoke a pop up (ON) for atte slider or MF knob adjustment
 #define PREAMP_BTN  5       // On off
 #define BAND_BTN    6       // Pops up Band Window.  Touch or MF can change bands
 //Panel 2  These swap out
@@ -349,7 +349,7 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define ZOOM_BTN    11      // Sets Zoom level
 #define PAN_BTN     12      // Enables PAN spectrum shift
 //Panel 3
-#define MENU_BTN    13      // invoke a pop up (ON) for atten slider or MF knob adjustment
+#define MENU_BTN    13      // invoke a pop up (ON) for attn slider or MF knob adjustment
 #define ANT_BTN     14      // Antenna switch
 #define ATU_BTN     15      // not implemented yet
 #define XMIT_BTN    16      // not implemented yet
@@ -601,7 +601,7 @@ struct Modes_List {
     uint8_t     data;
 };
 
-enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATTEN_LBL, PREAMP_LBL, ATU_LBL, RIT_LBL, XIT_LBL, FINE_LBL, NB_LBL, NR_LBL, NOTCH_LBL, SPLIT_LBL, MUTE_LBL, XMIT_LBL, XVTR_LBL, REFLVL_LBL, SPOT_LBL, ZOOM_LBL, PAN_LBL, DATA_LBL};
+enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATTN_LBL, PREAMP_LBL, ATU_LBL, RIT_LBL, XIT_LBL, FINE_LBL, NB_LBL, NR_LBL, NOTCH_LBL, SPLIT_LBL, MUTE_LBL, XMIT_LBL, XVTR_LBL, REFLVL_LBL, SPOT_LBL, ZOOM_LBL, PAN_LBL, DATA_LBL};
 /*
 #define BAND_LBL    0       // Band label (if used)
 #define MODE_LBL    1       // index to button
@@ -609,7 +609,7 @@ enum Label_List {BAND_LBL, MODE_LBL, FILTER_LBL, RATE_LBL, AGC_LBL, ANT_LBL, ATT
 #define RATE_LBL    3       // will display the RATE (step) value in the button
 #define AGC_LBL     4       // will display the AGC value in the button
 #define ANT_LBL     5       // Antenna switch
-#define ATTEN_LBL   6       // invoke a pop up (ON) for atten slider or MF knob adjustment
+#define ATTN_LBL   6       // invoke a pop up (ON) for attn slider or MF knob adjustment
 #define PREAMP_LBL  7       // On off
 #define ATU_LBL     8       // not implemented yet
 #define RIT_LBL     9       // not implemented yet 

@@ -213,12 +213,12 @@ COLD void i2c_encoder_rotated(i2cEncoderLibV2* obj)
 								note(CHANNEL, 52, (user_settings[user_Profile].afGain * 1.27));  // scale 100% to 127 for MIDI max of 127.
 							#endif  
 							break;
-		case ATTEN_BTN:     sprintf(string, " ATT:%d", bandmem[curr_band].attenuator_dB);
+		case ATTN_BTN:     sprintf(string, " ATT:%d", bandmem[curr_band].attenuator_dB);
 							MeterInUse = true;
 							displayMeter(bandmem[curr_band].attenuator_dB/10, string, 5);   // val, string label, color scheme
 							if (bandmem[curr_band].attenuator_dB < 2  || bandmem[curr_band].attenuator_dB > 98)
 								tval = 0xFF0000;  // Change to red
-							//Atten(0);
+							//Attn(0);
 							break;
 		case REFLVL_BTN:   	sprintf(string, "Lvl:%d", bandmem[curr_band].sp_ref_lvl);
 							MeterInUse = true; 

@@ -109,9 +109,9 @@ void XIT(int8_t delta);
 void setRIT(int8_t toggle);
 void RIT(int8_t delta);
 void Preamp(int8_t toggle);
-void setAtten(int8_t toggle);
+void setAttn(int8_t toggle);
 void VFO_AB();
-void Atten(int8_t delta);
+void Attn(int8_t delta);
 void setAFgain(int8_t toggle);
 void AFgain(int8_t delta);
 void setRFgain(int8_t toggle);
@@ -128,7 +128,7 @@ void Zoom(int8_t dir);
 void setZoom(int8_t toggle);
 void PAN(int8_t delta);
 void setPAN(int8_t toggle);
-void digital_step_attenuator_PE4302(int16_t _atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
+void digital_step_attenuator_PE4302(int16_t _attn); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 void setEncoderMode(uint8_t role);
 
 //
@@ -218,9 +218,11 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 
     DPRINTLNF("changeBands: Set other per band settings");
     // Split(0);
-    setAtten(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    get_Attn_from_Radio();  //sync up with radio
+    setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     //selectBandwidth(bandmem[curr_band].filter);
     // dB level is set elsewhere and uses value in the dB in this function.
+    get_Preamp_from_Radio(); // sync up with radio
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     selectAgc(bandmem[curr_band].agc_mode);
     RefLevel(0); // 0 just updates things to be current value
@@ -531,14 +533,16 @@ COLD void VFO_AB(void)
     DPRINTLN(VFOB);
 }
 
-//  setAtten 
+//  setAttn 
 //   -1 sets attenuator state to current database value. Used for startup or changing bands.
 //    0 sets attenuator state off
 //    1 sets attenuator state on
 //    2 toggles attenuator state
 //    3 sets meter active and allow adjustment via MF knob
-COLD void setAtten(int8_t toggle)
+COLD void setAttn(int8_t toggle)
 {
+    CIVresult_t CIVresultL;
+
     if (bandmem[curr_band].attenuator_byp == 1 && toggle == 3)
         toggle = 1;
 
@@ -550,18 +554,18 @@ COLD void setAtten(int8_t toggle)
             toggle = 1;
     }
 
-    if (toggle == 1) // toggle is 1, turn on Atten
+    if (toggle == 1) // toggle is 1, turn on Attn
     {
         bandmem[curr_band].attenuator_byp = 1;        // Turn relay ON for hardware attenuator
-        bandmem[curr_band].attenuator     = ATTEN_ON; // le the attenuator tracking state to ON
+        bandmem[curr_band].attenuator     = ATTN_ON; // le the attenuator tracking state to ON
         MeterInUse                        = true;
-        setMeter(ATTEN_BTN);
+        setMeter(ATTN_BTN);
     }
 
     if (toggle == 0)
     {
         bandmem[curr_band].attenuator_byp = 0;         // Turn relay off bypassing hardware attenuator
-        bandmem[curr_band].attenuator     = ATTEN_OFF; // set attenuator tracking state to OFF
+        bandmem[curr_band].attenuator     = ATTN_OFF; // set attenuator tracking state to OFF
     }
 
     if (toggle == 0 || toggle == -1)
@@ -571,49 +575,60 @@ COLD void setAtten(int8_t toggle)
     }
 
     // Set the attenuation level from the value in the database
-    Atten(0);  // 0 = no change to set attenuator level to value in database for this band
+    Attn(0);  // 0 = no change to set attenuator level to value in database for this band
+
+    if (bandmem[curr_band].attenuator) 
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_ON].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("Attn_to_Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
+    else
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("Attn_to_Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
 
     displayAttn();
 
-    // DPRINTF("Set Attenuator Relay to "); DPRINT(bandmem[curr_band].attenuator_byp); DPRINTF(" Atten_dB is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
+    // DPRINTF("Set Attenuator Relay to "); DPRINT(bandmem[curr_band].attenuator_byp); DPRINTF(" Attn_dB is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
     // DPRINTF(" and Ref Level is "); DPRINTLN(Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor);
 }
 
 /*******************************************************************************
- * Function Name: Atten()
+ * Function Name: Attn()
  ********************************************************************************
  *
  * Summary:
  * Main function performs following functions:
  * 1: Configures the solid state attenuator by shifting 16 bits of address and
- *    atten level in LSB first.
+ *    attn level in LSB first.
  *
  * Parameters:
- *  atten = attenuation level to set in range of 0 to 100% (0 to 31 (in dB))
+ *  attn = attenuation level to set in range of 0 to 100% (0 to 31 (in dB))
  *
  * Return:
  *  None.
  *
  *******************************************************************************/
-COLD void Atten(int8_t delta)
+COLD void Attn(int8_t delta)
 {
-    int8_t _atten = bandmem[curr_band].attenuator_dB;
+    int8_t _attn = bandmem[curr_band].attenuator_dB;
 
-    _atten += delta * 3;
+    _attn += delta * 3;
 
-    if (_atten > 100) // Keep in 0-100 range
-        _atten = 100;
-    if (_atten <= 0)
-        _atten = 0;
-    bandmem[curr_band].attenuator_dB = _atten; // Assign new valid value
+    if (_attn > 100) // Keep in 0-100 range
+        _attn = 100;
+    if (_attn <= 0)
+        _attn = 0;
+    bandmem[curr_band].attenuator_dB = _attn; // Assign new valid value
 
     // DPRINT("Setting attenuator value to "); DPRINTLN(bandmem[curr_band].attenuator_dB);
 
     displayAttn(); // update the button value
 
-    // CALL HARDWARE SPECIFIC ATENUATOR or FIXED ATTEN HERE
+    // CALL HARDWARE SPECIFIC ATENUATOR or FIXED ATTN HERE
     // This is for the PE4302 only.
-    digital_step_attenuator_PE4302(_atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
+    digital_step_attenuator_PE4302(_attn); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 }
 
 // PREAMP button
@@ -624,6 +639,8 @@ COLD void Atten(int8_t delta)
 //
 COLD void Preamp(int8_t toggle)
 {
+    CIVresult_t CIVresultL;
+    
     if (toggle == 2) // toggle state
     {
         if (bandmem[curr_band].preamp == PREAMP_ON)
@@ -655,6 +672,17 @@ COLD void Preamp(int8_t toggle)
     codec1.unmuteHeadphone(); // Audio out to Line-Out and TX board
     AFgain(0); //   Reset afGain to last used to bypass thumps
 #endif
+
+    if (bandmem[curr_band].preamp) 
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_ON].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("PreAmp_to_Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
+    else
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("PreAmp_to_Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
 
     displayPreamp();
     // DPRINTF("Set Preamp to "); DPRINTLN(bandmem[curr_band].preamp);
@@ -1744,8 +1772,8 @@ void setEncoderMode(uint8_t role)
 
 // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 // Code is for the PE4302 digital step attenuator
-// Can clone and modify this for other hardware, call it from teh ATTEN() function
-COLD void digital_step_attenuator_PE4302(int16_t _atten)
+// Can clone and modify this for other hardware, call it from teh ATTN() function
+COLD void digital_step_attenuator_PE4302(int16_t _attn)
 {
     #ifndef PE4302
         DPRINTLN(F("PE4302 digital step attenuator not configured, skipping"));
@@ -1757,23 +1785,23 @@ COLD void digital_step_attenuator_PE4302(int16_t _atten)
     char atten_str[8]  = {'\0'};
     char atten_data[8] = {'\0'};
     uint8_t i;
-    int16_t atten;
+    int16_t attn;
 
     // scale 0 to 100% to size of attenuator hardware.  Assuming 0 to 31dB here.
-    atten = round(((_atten * atten_size_31 / 100) - 0.5)); // round down to get 0-31 range
+    attn = round(((_atten * atten_size_31 / 100) - 0.5)); // round down to get 0-31 range
 
-    if (atten >= atten_size_31) // will crash is exceed 0 to 31!
-        atten = atten_size_31;
-    if (atten < 0)
-        atten = 0;
+    if (attn >= atten_size_31) // will crash is exceed 0 to 31!
+        attn = atten_size_31;
+    if (attn < 0)
+        attn = 0;
 
-    //DPRINT("digital step converted = ");DPRINTLN(atten);
+    //DPRINT("digital step converted = ");DPRINTLN(attn);
 
     // comment out for 0.5dB steps
-    //atten *= 2; // shift the value x2 so the LSB controls the 1dB step.
+    //attn *= 2; // shift the value x2 so the LSB controls the 1dB step.
 
     /* Convert to 8 bits of  0 and 1 format */
-    itoa(atten, atten_str, 2);
+    itoa(attn, atten_str, 2);
     //DPRINTLN(atten_str);   // should be 6 bits of binary in the range of 0 to 64
     
     // Convert to 6 bits of  0 and 1 format 
@@ -1998,12 +2026,22 @@ COLD uint8_t get_MY_POSITION_from_Radio(void)
 }
 
 // Used to request status from radio
-COLD uint8_t get_PreAmp_from_Radio(void)
+COLD uint8_t get_Preamp_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    return CIVresultL.value;
+}
+
+// Used to request status from radio
+COLD uint8_t get_Attn_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_Atten_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     return CIVresultL.value;
 }
 

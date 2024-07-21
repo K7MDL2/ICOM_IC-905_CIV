@@ -470,7 +470,10 @@ void setup()
 
     get_MY_POSITION_from_Radio();
     delay(10);
-    get_PreAmp_from_Radio();
+    get_Preamp_from_Radio();
+    delay(10);
+    get_Attn_from_Radio();
+    delay(10);
 }
 
 void loop()
@@ -1293,7 +1296,7 @@ COLD void MF_Service(int8_t counts, uint8_t knob)
         case AFGAIN_BTN:    AFgain(counts);         break;
         case REFLVL_BTN:    RefLevel(counts*-1);    break;
         case PAN_BTN:       PAN(counts);            break;
-        case ATTEN_BTN:     Atten(counts);          break;  // set attenuator level to value in database for this band
+        case ATTN_BTN:      Attn(counts);          break;  // set attenuator level to value in database for this band
         case NB_BTN:        NBLevel(counts);        break;
         case ZOOM_BTN:      if (counts > 0) counts =  1;
                             if (counts < 0) counts = -1;
@@ -1346,7 +1349,7 @@ COLD void unset_MF_Service(uint8_t old_client_name) // clear the old owner butto
 
     // This must be from a timeout or a new button before timeout
     // Turn off button of the previous owner, if any, using the MF knob at change of owner or timeout
-    // Some buttons can be left on such as Atten or other non-button MF users.  Just leave them off this list.
+    // Some buttons can be left on such as Attn or other non-button MF users.  Just leave them off this list.
     switch (old_client_name)
     {
         case NONE:                              break;  // no current owner, return
@@ -1355,14 +1358,14 @@ COLD void unset_MF_Service(uint8_t old_client_name) // clear the old owner butto
         case REFLVL_BTN:    setRefLevel(-1);    break;
         case PAN_BTN:       setPAN(-1);         break;
         case ZOOM_BTN:      setZoom(-1);        break;
-        case ATTEN_BTN:     setAtten(-1);       break;
+        case ATTN_BTN:      setAttn(-1);       break;
         case NB_BTN:        setNB(-1);          break;
         case RIT_BTN:       setRIT(-1);         break;
         case XIT_BTN:       setXIT(-1);         break;    
         case MFTUNE:
         default:    //MF_client = encoder_list[0].default_MF_client;
                     //DPRINTF("unset_MF_Service: set default to "); DPRINTLN(MF_client);
-                    break;  // No button for VFO tune, atten button stays on
+                    break;  // No button for VFO tune, attn button stays on
     }
 }
 

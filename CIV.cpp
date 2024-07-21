@@ -48,20 +48,23 @@ struct cmdList cmd_List[End_of_Cmd_List] = {
     {CIV_C_LSB_D0_F2_SEND,  {5,0x26,0x00,0x00,0x00,0x02}},  // selected VFO; mod USB; Data OFF; RX_filter F2;
     {CIV_C_LSB_D1_F2_SEND,  {5,0x26,0x00,0x00,0x01,0x02}},  // selected VFO; mod USB; Data ON; RX_filter F2;
     {CIV_C_FM_D1_F1_SEND,   {5,0x26,0x00,0x05,0x01,0x01}},  // selected VFO; mod USB; Data ON; RX_filter F2;
-    {CIV_C_ATTN_OFF_READ,   {2,0x11,0x00}},                  // Atten OFF
-    {CIV_C_ATTN_ON_READ,    {2,0x11,0x01}},                  // Atten 10dB (144, 432, 1200 bands only)
-    {CIV_C_SPLIT_OFF_READ,  {2,0x0F,0x00}},                  // read Split OFF
-    {CIV_C_SPLIT_ON_READ,   {2,0x0F,0x01}},                  // read split ON
-    {CIV_C_SPLIT_OFF_SEND,  {2,0x0F,0x01}},                  // set split OFF
-    {CIV_C_SPLIT_ON_SEND,   {2,0x0F,0x01}},                  // Set split ON
-    {CIV_C_RFGAIN,          {2,0x14,0x02}},                  // send/read RF Gain
-    {CIV_C_AFGAIN,          {2,0x14,0x01}},                  // send/read AF Gain
-    {CIV_C_RFPOWER,         {2,0x14,0x0A}},                  // send/read selected bands RF power
-    {CIV_C_S_MTR_LVL,       {2,0x15,0x02}},                  // send/read S-meter level (00 00 to 02 55)  00 00 = S0, 01 20 = S9, 02 41 = S9+60dB
-    {CIV_C_PREAMP,          {2,0x16,0x02}},                  // send/read preamp 00 = OFF, 01 = ON
-    {CIV_C_AGC,             {2,0x16,0x12}},                  // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
-    {CIV_C_CW_MSGS,         {1,0x17}},                       // Send CW messages see page 17 of prog manual for char table
-    {CIV_C_BSTACK,          {2,0x1A,0x01}},                  // send/read BandStack contents - see page 19 of prog manual.  
+    {CIV_C_ATTN_READ,   	{1,0x11}},                  	// Attn read state
+	{CIV_C_ATTN_OFF,   		{2,0x11,0x00}},                 // Attn OFF
+    {CIV_C_ATTN_ON,    		{2,0x11,0x10}},                 // Attn 10dB (144, 432, 1200 bands only)
+    {CIV_C_SPLIT_OFF_READ,  {2,0x0F,0x00}},                 // read Split OFF
+    {CIV_C_SPLIT_ON_READ,   {2,0x0F,0x01}},                 // read split ON
+    {CIV_C_SPLIT_OFF_SEND,  {2,0x0F,0x01}},                 // set split OFF
+    {CIV_C_SPLIT_ON_SEND,   {2,0x0F,0x01}},                 // Set split ON
+    {CIV_C_RFGAIN,          {2,0x14,0x02}},                 // send/read RF Gain
+    {CIV_C_AFGAIN,          {2,0x14,0x01}},                 // send/read AF Gain
+    {CIV_C_RFPOWER,         {2,0x14,0x0A}},                 // send/read selected bands RF power
+    {CIV_C_S_MTR_LVL,       {2,0x15,0x02}},                 // send/read S-meter level (00 00 to 02 55)  00 00 = S0, 01 20 = S9, 02 41 = S9+60dB
+   	{CIV_C_PREAMP_READ,     {2,0x16,0x02}},             	// read preamp state
+    {CIV_C_PREAMP_OFF,      {3,0x16,0x02,0x00}},            // send/read preamp 3rd byte is on or of for sending - 00 = OFF, 01 = ON
+	{CIV_C_PREAMP_ON,       {3,0x16,0x02,0x01}},            // send/read preamp 3rd byte is on or of for sending - 00 = OFF, 01 = ON
+    {CIV_C_AGC,             {2,0x16,0x12}},                 // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
+    {CIV_C_CW_MSGS,         {1,0x17}},                      // Send CW messages see page 17 of prog manual for char table
+    {CIV_C_BSTACK,          {2,0x1A,0x01}},                 // send/read BandStack contents - see page 19 of prog manual.  
                                                                     // data byte 1 0xyy = Freq band code
                                                                     // dat abyte 2 0xzz = register code 01, 02 or 03
                                                                     // to read 432 band stack register 1 use 0x1A,0x01,0x02,0x01
@@ -364,21 +367,45 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					break;
 				}  // UTC Offset
 
-				case CIV_C_PREAMP:	
+				case CIV_C_PREAMP_READ:	
+				case CIV_C_PREAMP_ON:
+    			case CIV_C_PREAMP_OFF:
 				{
 					uint8_t _val = CIVresultL.value;
 					//get from_Radio();
 					DPRINTF("check_CIV: CI-V Returned PreAmp status: "); DPRINTLN(_val);
 					if (_val == 1)
-						bandmem[curr_band].preamp = 1;
+					{
+						setAttn(0); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+						Preamp(1);
+					}
 					if (_val == 0)
-						bandmem[curr_band].preamp = 0;
+						Preamp(0);
 					msg_type = 8;
 					freqReceived = false;
-					Preamp(-1);
 					displayPreamp();
 					break;
 				}  // Preamp changed
+
+				case CIV_C_ATTN_READ:	
+				case CIV_C_ATTN_ON:
+    			case CIV_C_ATTN_OFF:
+				{
+					uint8_t _val = CIVresultL.value;
+					//get from_Radio();
+					DPRINTF("check_CIV: CI-V Returned PreAmp status: "); DPRINTLN(_val);
+					if (_val == 1)
+					{
+						Preamp(0);
+						setAttn(1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+					}
+					if (_val == 0)
+						setAttn(0); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+					msg_type = 9;
+					freqReceived = false;
+					displayAttn();
+					break;
+				}  // Attn changed
 
 			}  // end switch
 			return msg_type;

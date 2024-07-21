@@ -482,7 +482,7 @@ COLD uint8_t Gesture_Handler(uint8_t _gesture, uint8_t _dragEvent, uint8_t _hold
             //DPRINTLN(MF_client); 
             switch (MF_client) {
                 case NB_BTN:        x /= SCREEN_WIDTH/NB_SET_NUM/2;  break; // scale for 7 steps
-                //case ATTEN_BTN:
+                //case ATTN_BTN:
                 //case AFGAIN_BTN:
                 //case REFLVL_BTN:
                 //case RIT_BTN:
@@ -697,7 +697,7 @@ COLD void Button_Handler(int16_t x, uint16_t y, uint8_t _holdtime)
                 {
                     case NB_BTN:        setNB(1);       break; //Increment the mode from current value           
                     case AGC_BTN:       AGC(0);         break;   
-                    case ATTEN_BTN:     setAtten(3);    break; // 3 if on, adjust value, 2 = toggle state, 1 is set, 1 is off, -1 use current      
+                    case ATTN_BTN:      setAttn(3);    break; // 3 if on, adjust value, 2 = toggle state, 1 is set, 1 is off, -1 use current      
                     case SMETER_BTN:    setRFgain(1);   break;
                     case PAN_BTN:       setPAN(3);      break;  // set pan to center
                     case RIT_BTN:       setRIT(3);      break;
@@ -739,7 +739,7 @@ COLD void Button_Handler(int16_t x, uint16_t y, uint8_t _holdtime)
                     case RATE_LBL:      Rate(0);        break;
                     case AGC_LBL:       AGC(2);         break;
                     case ANT_LBL:       Ant();          break;
-                    case ATTEN_LBL:     setAtten(2);    break;
+                    case ATTN_LBL:      setAttn(2);    break;
                     case RIT_LBL:       setRIT(2);      break;
                     case XIT_LBL:       setXIT(2);      break;
                     case NB_LBL:        setNB(2);       break;
@@ -804,7 +804,7 @@ void Button_Action(uint16_t button_name)
             case MUTE_BTN:      Mute();         break;
             case MENU_BTN:      Menu();         break;
             case VFO_AB_BTN:    VFO_AB();       break; // VFO A and B Switching button - Can touch the A/B button or the Frequency Label itself to toggle VFOs
-            case ATTEN_BTN:     setAtten(2);    break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
+            case ATTN_BTN:      setAttn(2);    break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
             case PREAMP_BTN:    Preamp(2);      break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
             case RIT_BTN:       setRIT(2);      break;
             case XIT_BTN:       setXIT(2);      break;

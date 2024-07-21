@@ -40,9 +40,9 @@ void XIT(int8_t delta);
 void setRIT(int8_t toggle);
 void RIT(int8_t delta);
 void Preamp(int8_t toggle);
-void setAtten(int8_t toggle);
+void setAttn(int8_t toggle);
 void VFO_AB();
-void Atten(int8_t delta);
+void Attn(int8_t delta);
 void setAFgain(int8_t toggle);
 void AFgain(int8_t delta);
 void setRFgain(int8_t toggle);
@@ -57,7 +57,7 @@ void Zoom(int8_t dir);
 void setZoom(int8_t toggle);
 void setPAN(int8_t toggle);
 void PAN(int8_t delta);
-void digital_step_attenuator_PE4305(int16_t _atten);   // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
+void digital_step_attenuator_PE4305(int16_t _attn);   // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band);
 void clearMeter(void);
 void send_Mode_to_Radio(uint8_t mndx);
@@ -66,6 +66,7 @@ uint8_t get_Mode_from_Radio(void);
 uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg);   // Ask the radio for band and register contents 
 uint8_t get_MY_POSITION_from_Radio(void);
 uint8_t get_RXTX_from_Radio(void);
-uint8_t get_PreAmp_from_Radio(void);
+uint8_t get_Preamp_from_Radio(void);
+uint8_t get_Attn_from_Radio(void);
 
 #endif  // _CONTROLS_H_
