@@ -193,13 +193,6 @@ int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9
 int16_t     xit_offset              = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
 int16_t     rit_offset_last         = 0;    // track last used value when turning the RIT on and off. 
 int16_t     xit_offset_last         = 0;    // track last used value when turning the RIT on and off. 
-uint8_t     clipping                = 0;    // track state of clipping (primarily RS-HFIQ but could be applied to any RF hardware that has such indications)
-int16_t     fft_size            = FFT_SIZE;       // This value will be passed to the init function.
-                                                  // Ensure the matching FFT resources are enabled in the lib .h file!                            
-int16_t     fft_bins            = (int16_t) fft_size;       // Number of FFT bins which is FFT_SIZE/2 for real version or FFT_SIZE for iq version
-float       sample_rate_Hz      = 44100.0f;  //43Hz /bin  12.5K spectrum
-float       fft_bin_size        = sample_rate_Hz/(fft_size*2);   // Size of FFT bin in HZ.  From sample_rate_Hz/FFT_SIZE for iq
-
 //
 //----------------------------------------------------------------------------------------------------------------------------
 //
@@ -240,8 +233,7 @@ void setup()
     if (CrashReport) Serial.print(CrashReport);
 
     DPRINTLNF("Initializing SDR_RA887x Program");
-    DPRINTF("FFT Size is ");
-    DPRINTLN(fft_size);
+
     DPRINTLNF("**** Running I2C Scanner ****");
 
     // ---------------- Setup our basic display and comms ---------------------------
@@ -388,8 +380,6 @@ void setup()
 
     PC_Debug_port.println("End of Setup");
 
-    FrequencyRequest();
-
      // -------- Read SD Card data----------------------------------------------------------
     // To use the audio card SD card Reader instead of the Teensy 4.1 onboard Card Reader
     // UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD   ***IF*** they are not used for something else:
@@ -430,7 +420,7 @@ void setup()
         {
             if (read_BSTACK_from_Radio(i, j) == 0)  // read band stack reg 1 for 144Mhz to get the mode, filter freq
                 while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
-                    delay(2);
+                    delay(20);
         }
     }
 
@@ -479,6 +469,8 @@ void setup()
     // displayRefresh();
 
     get_MY_POSITION_from_Radio();
+    delay(10);
+    get_PreAmp_from_Radio();
 }
 
 void loop()
@@ -538,32 +530,26 @@ void loop()
             displayFreq();   // Update screen
             }
         }
-        
-        if (ret_val == 2 || ret_val == 4)  // got modulation mode
+        else if (ret_val == 2)
         {
-            if (ret_val == 2)
-            {
-                DPRINTF("Loop: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
-            }
-            else if (ret_val == 4)
-            {
-                set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
-                DPRINTF("Loop: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
-            }
+            DPRINTF("Loop: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
+            get_Mode_from_Radio();  // get extened data for DATa on/off state
         }
-
-        if (ret_val == 5)  // RX TX status received
+        else if (ret_val == 4)
+        {
+            set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
+            DPRINTF("Loop: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
+        }
+        else if (ret_val == 5)  // RX TX status received
         {
             DPRINTF("Loop: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
             displayXMIT();
         }
-
-        if (ret_val == 6 || ret_val == 7)  // RX TX status received
+        else if (ret_val == 6 || ret_val == 7)  // RX TX status received
         {
             DPRINTF("Loop: TIME = "); DPRINTLN("time XXXXX");
             displayTime();
         }
-
     }
 
     //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.

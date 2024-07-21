@@ -43,22 +43,6 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
                             // To enable touch by uncommenting this config item
                             //   #define USE_FT5206_TOUCH//capacitive touch screen
             
-//#define OCXO_10MHZ        // Uncomment this line to use a different library that supports External CLKIN for si5351C version PLL boards.
-                            // DEPENDS on si5351C version PLL board.  Otherwise uses the standard issue Si5351A PLL
-
-//#define si5351_TCXO       // If your Si5351 PLL module has a TCXO then turn off the load capacitors.
-                            // DEPENDS on a modified si5351mcu mod by library by K7MDL.
-                            // Alternative is to use the Etherkit library or Adafruit or other. 
-
-//#define si5351_XTAL_25MHZ   // This depends on what your PLL uses.
-                            // Uncomment this if your Si5351A crysal is 25MHz
-                            // Commented out it will use 27MHz in VFO.h
-                            // This is ignored if OCXO_10MHz is defined.
-                            // DEPENDS on your crystal being 25Mhz
-
-//#define si5351_CORRECTION  0  // frequency correction for the si5351A PLL board crystal or TXCO.
-                            // The Si5351mcu library uses Hz offset, etherkit and others use ppb.
-
 //#define PE4302            // PE4302 Digital step attenuator. 31.5dB in 0.5 steps, only using 1dB steps today
                             // Harmless to leave this defined as long as it is not connected via an I2C port expander
                             // DEPENDS on a PE4302 connected for variable attenuation
@@ -70,9 +54,6 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
                             // This is used to correct the dBm scale on the spectrum 
                             // Can also fudge it to calibrate the spectrum until a more elegant solution is built
 
-//#define SV1AFN_BPF        // Bandpass filter via I2C port expander.  Will hang if you do not have the port expander.
-                            // DEPENDS on SV1AFN BPF board connected via a MCP23017 I2C port expander.
-
 //#define ENET              // Turn off or on ethernet features and hardware. Teeny4.1 has ethernet built in but needs an external connector.
                             // It wants to find a valid link status (Cable connected) or may not be happy.
                             // Configured to use DHCP right now.
@@ -80,6 +61,8 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
                             // Choose to use DHCP or a static IP address for the SDR
 
 #define USE_DHCP            // Use DHCP rather then define a static IP address (which is Defined further below)
+
+#define UTC 1               // if UTC == 1 display time as UTC.  IF 0 then UTC offset from radio is applied for local time.
 
 // #define I2C_LCD          // Turn on or off the optional I2C character LCD display.   
                             // Look below to set the i2c address and the size of the display.
@@ -153,34 +136,6 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 #define VARIABLE_FILTER   1  // when undefined or set to 0, the encoder will cycle through predefined filter widths same as the touch buttons do.  
                              // When active, the encoder (only) will be variable over the allowed range based on mode and change in various step rates according to freqwuncy.
                              //  50Hz < 1KHz, 100Hz 1-3KHz and 200Hz > 3KHz.  Max is 6.  FM is fixed and shows as N/A width.
-
-//#define AUDIOBOOST   (1.0f) // Audio output amp gain.
-                            // 0/0 - 32767.0.   0.0 theoretically shuts off flow so should not be used.  
-                            // 1.0f is pass through (no gain or loss)
-                            // 0 to < 1.0f is attenuation level
-                            // > 1.0f is positive gain.  Too high and you can get clipping.  
-                            // See AudioAmplifer doc at https://www.pjrc.com/teensy/gui/index.html?info=AudioAmplifier
-
-// Choose 1024, 2048, or 4096  for AUDIO audio output- usually defined in the main program
-#define FFT_SIZE 4096
-
-// --->>>> Enable one or more FFT pipelines for 2nd window, pan and zoom, if used
-// Recommend all 3 be enabled for 3 zoom levels -  At least one must match FFT_SIZE
-#define FFT_4096 
-#define FFT_2048
-#define FFT_1024
-
-//-------------------------W7PUA Auto I2S phase correction-----------------
-//
-// Auto I2S alignment error correction (aka Twin Peaks problem)
-// Requires 10K resistors on each SGTL5000 codec LineIn pin (L and R) to a common GPIO pin, pin 22 by default, defined in this file
-//
-//#define W7PUA_I2S_CORRECTION  
-//
-// Can leave these 2 defined, no effect on other things.
-#define PIN_FOR_TP 22       // Teensy pin used for both Codec and I/O pin signal source methods (W7PUA I2S correction)
-#define SIGNAL_HARDWARE TP_SIGNAL_IO_PIN  // 10Kohm is for RS-HFIQ which has 100ohm output impedance.  Other audio sources may vary.
-// ---------------------------------------
 
 // --------------- Motherboard/Protoboard version --------------------------
 // Uncomment one of these to account for Touch interrupt differences, or

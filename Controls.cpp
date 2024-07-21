@@ -19,6 +19,7 @@ extern uint64_t VFOA;         // 0 value should never be used more than 1st boot
 extern uint64_t VFOB;
 extern struct Modes_List modeList[];
 extern struct Band_Memory bandmem[];
+extern struct cmdList cmd_List[];
 extern struct User_Settings user_settings[];
 extern struct Standard_Button std_btn[];
 extern struct Label labels[];
@@ -129,7 +130,6 @@ void PAN(int8_t delta);
 void setPAN(int8_t toggle);
 void digital_step_attenuator_PE4302(int16_t _atten); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
 void setEncoderMode(uint8_t role);
-
 
 //
 //----------------------------------- Skip to Ham Bands only ---------------------------------
@@ -296,10 +296,11 @@ COLD void setMode(int8_t dir)
         //bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
-    get_Mode_from_Radio(); 
+    //get_Mode_from_Radio(); 
+    //delay(20);
     
-    while (check_CIV(millis()))  // give time to respond -  Msg_type 3 is bstack results
-        delay(2);
+    //while (check_CIV(millis()))  // give time to respond -  Msg_type 3 is bstack results
+    //    delay(2);
 
     send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
@@ -1858,24 +1859,20 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
     return 0; // 0 means frequency was not found in the table
 }
 
-// Used to request mode from radio mode
-COLD uint8_t get_Mode_from_Radio(void)   // Change Mode of the current active VFO by increment delta.
+// Used to request extended mode from radio mode so we can get teh DATa on/off status.  Radio does not tell us when the DATA mode is changed
+COLD uint8_t get_Mode_from_Radio(void) 
 {
     CIVresult_t CIVresultL_mode;
 
-    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wChk);
+    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    delay(10);
     DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
     return CIVresultL_mode.retVal;
 }
 
-// Used to set remote to match the radio mode use mode index sent by radio
+// Used to set remote's mode to what heh radio reported, usually by getmode()
 COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
-    //DPRINT("set_Mode_from_Radio: mode index: "); DPRINTLN(mndx);  	
-    //CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, CIV_C_F26_READ, CIV_D_NIX, CIV_wFast);
-    //while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
-    //                delay(2);
-
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
         DPRINTF("set_Mode_from_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
@@ -1884,7 +1881,6 @@ COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current acti
 
     DPRINT("set_Mode_from_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
     bandmem[curr_band].mode_A = mndx; // get current mode table index
-
     
     displayDATA(); // update display
     displayMode();
@@ -1915,19 +1911,20 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     
     //    bandmem[curr_band].data_A = 1;  // set DATA on or off 
     
-    memcpy(data_str, CIV_C_MOD_SET, 4);  // copy a template then sub in the mode.
+    memcpy(data_str, &cmd_List[CIV_C_MOD_SET].cmdData, cmd_List[CIV_C_MOD_SET].cmdData[0]);  // copy a template then sub in the mode.
     data_str[3] = radio_mode;  // send the mode values
     data_str[4] = radio_data;  // set DATA on or off 
     data_str[5] = radio_filter;  // Set filter
     
-    DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("  Data: "); DPRINTLN(radio_data);    
+    DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("    Data: "); DPRINTLN(radio_data);    
 
     CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
-    while (CIVresultL_vfo.retVal > CIV_OK_DAV)
-    {
-        CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
-        delay(10);
-    }
+    //while (CIVresultL_vfo.retVal > CIV_OK_DAV)
+    //{
+    //    delay(40);
+    //    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+    //    DPRINTF("send_Mode_to_Radio: delay loop ret = "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);  
+    //}
     
     DPRINTF("send_Mode_to_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
     
@@ -1957,7 +1954,7 @@ COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radi
     data_str[1] = band;  // send the mode values
     data_str[2] = reg;  // send the mode values
 
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, CIV_C_BSTACK, data_str, CIV_wChk);
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_BSTACK].cmdData), data_str, CIV_wChk);
     //DPRINTF("read_BSTACK_from_Radio: retVal of BSTACK writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
     
     if (CIVresultL_vfo.retVal == CIV_OK)
@@ -1967,6 +1964,10 @@ COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radi
         //displayMode();
         return 0;
     }
+
+    delay(60);
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
+
     return 1;
 }
 
@@ -1975,7 +1976,7 @@ COLD uint8_t get_RXTX_from_Radio(void)   // Change Mode of the current active VF
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_TX, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_TX].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
     return CIVresultL.value;
 }
@@ -1985,15 +1986,24 @@ COLD uint8_t get_MY_POSITION_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_UTC, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_UTC_OFFSET].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of UTC Offset: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(2);
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, CIV_C_MY_POSIT_READ, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MY_POSIT_READ].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of MY POS: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(2);
 
     return CIVresultL.value;
 }
 
+// Used to request status from radio
+COLD uint8_t get_PreAmp_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    return CIVresultL.value;
+}
 

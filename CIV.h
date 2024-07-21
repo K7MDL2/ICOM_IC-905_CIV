@@ -11,9 +11,8 @@
 #include <Arduino.h>
 #include "ICOM_IC-905_CIV.h"
 #include "RadioConfig.h"
-//#include <CIVcmds.h>                    // https://github.com/K7MDL2/CIVmasterLib is my fork Icom CIV library https://github.com/WillyIoBrok/CIVmasterLib extended for the 905
+#include <CIVcmds.h>                    // https://github.com/K7MDL2/CIVmasterLib is my fork Icom CIV library https://github.com/WillyIoBrok/CIVmasterLib extended for the 905
 #include <CIVmaster.h>                  // CIVcmds.h is automatically included in addition
-#include <ICradio.h>                    // this would include CIVcmds.h and CIVmaster.h, if not included before !
 
 void getradioInfo(void);
 uint8_t check_CIV(uint32_t time_current_baseloop);
@@ -25,7 +24,7 @@ void pass_CAT_msgs_to_RADIO(void);
 //void pass_CAT_msg_to_PC(void);
 void show_CIV_log(void);
 void civ_setup(uint32_t currentTime);
-radioModMode_t getModMode(void);
+//radioModMode_t getModMode(void);
 uint8_t getByteResponse(const uint8_t m_Counter, const uint8_t offset, const uint8_t buffer[]);
 uint8_t getRadioMode(void);
 

@@ -283,8 +283,8 @@ struct Label labels[LABEL_NUM] = {
     {OFF, OFF,   0,   0,  40, 29, 3, BLACK,     BLUE,       BLACK,      CYAN,            BLACK, 4, 7, "B:\0"},  // Band, not in use now 
     #ifdef USE_RA8875
     {OFF,  ON,  10, 110,  80, 28, 3, BLACK,   myVDKORANGE,  BLACK,      myVDKORANGE,     BLACK, 4, 7, "Mode\0"}, //Set SHOW to ON if you want this label to be drawn on screen.
-    {OFF,  ON, 100, 110, 102, 28, 3, BLACK,     BLUE,       BLACK,      myDKPINK,        BLACK, 4, 7, "F:\0"},
-    {OFF,  ON, 210, 110,  85, 28, 3, BLACK,   myDKPINK,     BLACK,      myDKYELLOW,      BLACK, 4, 7, "R:\0"},
+    {OFF,  ON, 100, 110, 102, 28, 3, BLACK,     BLUE,       BLACK,      myDKPINK,        BLACK, 4, 7, "\0"},
+    {OFF,  ON, 210, 110,  85, 28, 3, BLACK,   myDKPINK,     BLACK,      myDKYELLOW,      BLACK, 4, 7, "\0"},
     {OFF,  ON, 150,  35,  74, 22, 3, BLACK,     WHITE,      BLACK,      myVDARKGREY,     BLACK, 5, 4, "AGC-\0"},
     {OFF,  ON,  10,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       WHITE,           BLACK, 6, 4, "ANT-\0"}, 
     {OFF,  ON, 303, 110,  60, 28, 3, BLACK,     DARKCYAN,   BLACK,      myVDARKGREY,     BLACK, 4, 7, "A:\0"},
@@ -302,8 +302,8 @@ struct Label labels[LABEL_NUM] = {
     {OFF,  ON, 628, 110,  58, 28, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 5, 7, "XVTR\0"}, // No label on screen for this today
     #else    
     {OFF,  ON,  10, 110,  80, 28, 3, BLACK,   myVDKORANGE,  BLACK,      myVDKORANGE,     BLACK,  4, 7, "Mode\0"}, //Set SHOW to ON if you want this label to be drawn on screen.
-    {OFF,  ON, 105, 110, 105, 28, 3, BLACK,   myDKPINK,     BLACK,      myDKPINK,        BLACK,  7, 7, "F:\0"},
-    {OFF,  ON, 225, 110,  85, 28, 3, BLACK,     BLUE,       BLACK,      myDKYELLOW,      BLACK,  7, 7, "R:\0"},
+    {OFF,  ON, 105, 110, 105, 28, 3, BLACK,   myDKPINK,     BLACK,      myDKPINK,        BLACK,  7, 7, "\0"},
+    {OFF,  ON, 225, 110,  85, 28, 3, BLACK,     BLUE,       BLACK,      myDKYELLOW,      BLACK,  7, 7, "\0"},
     {OFF,  ON, 150,  35,  74, 22, 3, BLACK,     WHITE,      BLACK,      myVDARKGREY,     BLACK,  5, 4, "AGC-\0"},
     {OFF, OFF,  10,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       WHITE,           BLACK,  6, 4, "ANT-\0"}, 
     {OFF,  ON, 325, 110,  85, 28, 3, BLACK,   myDARKBLUE,   BLACK,      myVDARKGREY,     BLACK,  4, 7, "ATT:\0"},
@@ -324,7 +324,7 @@ struct Label labels[LABEL_NUM] = {
     {OFF, OFF, 699, 419, 100, 22, 3, BLACK,     GREEN,      BLACK,      myVDARKGREY,     BLACK,  3, 4, "Spot\0"},  // No label on screen for this today
     {OFF, OFF, 583, 419, 100, 22, 3, BLACK,     GREEN,      BLACK,      myVDARKGREY,     BLACK,  2, 4, "Zoom\0"},  // No label on screen for this today
     {OFF, OFF, 699, 419, 100, 22, 3, BLACK,     GREEN,      BLACK,      myVDARKGREY,     BLACK,  3, 4, "Pan\0"},   // No label on screen for this today
-    {OFF, ON,   80,  65,  60, 22, 3, BLACK,     WHITE,      NAVY,        myVDARKGREY,     BLACK,  7, 4, "DATA\0"}   // IC-905 DATA on or off status
+    {OFF, ON,   80,  65,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK,  7, 4, "DATA\0"}   // IC-905 DATA on or off status
 };
 
 struct User_Settings user_settings[USER_SETTINGS_NUM] = {                      
