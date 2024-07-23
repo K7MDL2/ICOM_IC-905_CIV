@@ -4,9 +4,12 @@ Description:
 
 Project:
 
-This project taps is a CI-V decoder for the IC-905 control head.  A Teensy 4.0 or 4.1 USB host port connectes with the radio's USB-C serial port CI-V bus to extract frequency values to operate band decode outputs on GPIO pins - aka PTT breakout box and band decoder. 
+This project is a CI-V decoder and remote control UI for the IC-905 control head.  A Teensy 4.0 or 4.1 USB host port connectes with the radio's USB-C serial port CI-V bus to extract frequency values to operate band decode outputs on GPIO pins - aka PTT breakout box and band decoder. 
 
 It can run as a minimal headless package on a Teensy 4.0 for the purpose of a band decoder to operate antenna relays and power amps. Fit it with a RA8875 or RA8876 touchscreen display and optional encoder and buttons, you have a physical remote control head with a 4.3" (800x480px) or a 7" touchscreen (1024x600px). It can also act as a Transverter frequency and band select display with custom IF offset and dial calibration correction.  This is likely more useful for radios like the IC-705 or 7300, 9100 that are often used as 28MHz or 144 and 432Mhz IF rigs but in theory the IC-905 can be a very stable and capable IF for 6M and band > 10Ghz also.  A PC can still be connected to the radio through this decoder for both CI-V and GPS NMEA data. Useful for running WSJT-X.
+
+The leveraged Teensy SDR project is at https://github.com/K7MDL2/KEITHSDR
+The RF Wattmeter and Band decoder project is at https://github.com/K7MDL2/RF-Power-Meter-V1
 
 Why would some combo of knobs, buttons or touchscreen be useful you ask?
 
