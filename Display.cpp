@@ -432,7 +432,7 @@ COLD void displayRIT()
 	
 	drawLabel(RIT_LBL, &bandmem[curr_band].RIT_en);  // update label wiht on/off and any text changes.
 	draw_2_state_Button(RIT_BTN, &bandmem[curr_band].RIT_en);
-	
+
 	if (MF_client == RIT_BTN)  // use text string from above for s meter box
 	{ 
 		MeterInUse = true;
