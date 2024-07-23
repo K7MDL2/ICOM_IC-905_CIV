@@ -259,6 +259,9 @@ void setup()
     // Use for ANT switch
     if (GPIO_ANT_ENABLE) pinMode(GPIO_ANT_PIN, OUTPUT); // Took over SW6 default input pin to make this an output (by config)
 
+    // Set up band decoder output pins
+    Decoder_GPIO_Pin_Setup();
+
     // Serach for a default_MF_client tag and save it in a global var
     for (default_MF_slot = 0; default_MF_slot < NUM_AUX_ENCODERS; default_MF_slot++)
     {
@@ -1027,7 +1030,7 @@ void Check_GPIO_Switches(void)
 
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW1_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW1_ENABLE && (GPIO_SW1_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw1_pushed = GPIO_Sw_read(GPIO_sw1_pushed, GPIO_SW1_PIN, slot);
             break;
@@ -1035,7 +1038,7 @@ void Check_GPIO_Switches(void)
     }
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW2_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW2_ENABLE && (GPIO_SW2_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw2_pushed = GPIO_Sw_read(GPIO_sw2_pushed, GPIO_SW2_PIN, slot);
             break;
@@ -1043,7 +1046,7 @@ void Check_GPIO_Switches(void)
     }
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW3_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW3_ENABLE && (GPIO_SW3_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw3_pushed = GPIO_Sw_read(GPIO_sw3_pushed, GPIO_SW3_PIN, slot);
             break;
@@ -1051,7 +1054,7 @@ void Check_GPIO_Switches(void)
     }
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW4_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW4_ENABLE && (GPIO_SW4_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw4_pushed = GPIO_Sw_read(GPIO_sw4_pushed, GPIO_SW4_PIN, slot);
             break;
@@ -1059,7 +1062,7 @@ void Check_GPIO_Switches(void)
     }
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW5_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW5_ENABLE && (GPIO_SW5_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw5_pushed = GPIO_Sw_read(GPIO_sw5_pushed, GPIO_SW5_PIN, slot);
             break;
@@ -1067,7 +1070,7 @@ void Check_GPIO_Switches(void)
     }
     for (slot = 1; slot < NUM_AUX_ENCODERS; slot++) // NUM_AUX ENCODER defines the size of the encoder/switch table.
     {
-        if ((GPIO_SW6_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
+        if (GPIO_SW6_ENABLE && (GPIO_SW6_ENABLE == encoder_list[slot].id) && encoder_list[slot].enabled)
         {
             GPIO_sw6_pushed = GPIO_Sw_read(GPIO_sw6_pushed, GPIO_SW6_PIN, slot);
             break;
@@ -1085,15 +1088,13 @@ bool GPIO_Sw_read(bool sw_pushed, uint8_t sw_pin, uint8_t slot)
     // DPRINTF("Encoder List Slot # = "); DPRINTLN(slot);
     if (!digitalRead(sw_pin) && !sw_pushed)
     {
-        DPRINTF("Checking GPIO Switch - Start Timer - Slot = ");
-        DPRINTLN(slot);
+        DPRINTF("Checking GPIO Switch - Start Timer - Slot = "); DPRINTLN(slot);
         sw_pushed = true; //   Start button timer to test if this is going to be a tap or press
         gpio_switch_timer_start(encoder_list[slot].id);
     }
     else if (digitalRead(sw_pin) && sw_pushed)
     {
-        DPRINTF("Checking GPIO Switch - End Timer - Slot = ");
-        DPRINTLN(slot);
+        DPRINTF("Checking GPIO Switch - End Timer - Slot = "); DPRINTLN(slot);
         sw_pushed = false;
         gpio_switch_click(encoder_list[slot].id); // switch released, process action, tap and press
     }

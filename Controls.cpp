@@ -219,10 +219,13 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
         setRIT(0); // turn off if it was off before on this new band
 */
     selectFrequency(0);
-  
+    
+    // converts the current band number to a pattern which is then applied to a group of GPIO pins.
+    // You can edit the patern for each band in RadioConfig.h
+    Band_Decode_Output(curr_band);
+
     // Example how and when to output new Band Decoder pattern on output IO pins. Pins assignments TBD.
     // Set the new band decoder output pattern for this band change
-// uint16_t BandDecodePatternByte = bandmem[curr_band].bandDecode;
 
     DPRINTLNF("changeBands: Set other related band settings");
     // Split(0);
@@ -2206,4 +2209,82 @@ COLD uint8_t send_AGC_to_Radio(void)
     delay(20);
     Check_radio();
     return CIVresultL.value;
+}
+
+// Very basic - oupuits a set pattern for each band.  Follows the ELecraft K3 patther for comnbined HF and VHF used for transverters and antenna swicthing
+// This may control a external band decoder that accept wired inputs.  Other decoder outpout can be serial or ethernet
+void Band_Decode_Output(uint8_t band)
+{
+    // Convert frequency band to a parallel wire GPIO putput pattern.
+    // On a Elecraft K3 this is equivalent to the HF-TRN mode.  Digout is used in combo with Band Decode BCD 0-3 pins.  
+    // The pattern 0xYYXX where YY is 01 for VHF+ band group and 00 for HF band group.  XX is the band identifier witin each HF and VHF group.
+    // Edit this to be anyting you want.
+    // Set your desired patterns in RAdioConfig.h
+    // ToDo: Eventually create a local UI screen to edit and monitor pin states
+
+    DPRINTF("Band_Decode_Output: Band: "); DPRINTLN(band);
+
+    switch (band)
+    {
+       case  BAND160M : GPIO_Out(DECODE_BAND160M); break;   //160M 
+       case  BAND80M  : GPIO_Out(DECODE_BAND80M);  break;   //80M
+       case  BAND60M  : GPIO_Out(DECODE_BAND60M);  break;   //60M
+       case  BAND40M  : GPIO_Out(DECODE_BAND40M);  break;   //40M
+       case  BAND30M  : GPIO_Out(DECODE_BAND30M);  break;   //30M
+       case  BAND20M  : GPIO_Out(DECODE_BAND20M);  break;   //20M
+       case  BAND17M  : GPIO_Out(DECODE_BAND17M);  break;   //17M      
+       case  BAND15M  : GPIO_Out(DECODE_BAND15M);  break;   //15M
+       case  BAND12M  : GPIO_Out(DECODE_BAND12M);  break;   //12M
+       case  BAND10M  : GPIO_Out(DECODE_BAND10M);  break;   //10M
+       case  BAND6M   : GPIO_Out(DECODE_BAND6M);   break;   //6M
+        //case BAND70   : GPIO_Out(0x01); break;   //6M
+       case  BAND144  : GPIO_Out(DECODE_BAND144);  break;   //2M
+       case  BAND222  : GPIO_Out(DECODE_BAND222);  break;   //222
+       case  BAND432  : GPIO_Out(DECODE_BAND432);  break;   //432
+       case  BAND902  : GPIO_Out(DECODE_BAND902);  break;   //902
+       case  BAND1296 : GPIO_Out(DECODE_BAND1296); break;   //1296
+       case  BAND2400 : GPIO_Out(DECODE_BAND2400); break;   //2400
+       case  BAND3400 : GPIO_Out(DECODE_BAND3400); break;   //3400
+       case  BAND5760 : GPIO_Out(DECODE_BAND5760); break;   //5760M
+       case  BAND10G  : GPIO_Out(DECODE_BAND10G);  break;   //10.368.1G
+       case  BAND24G  : GPIO_Out(DECODE_BAND24G);  break;   //24.192G
+       case  BAND47G  : GPIO_Out(DECODE_BAND47G);  break;   //47.1G
+       case  BAND76G  : GPIO_Out(DECODE_BAND76G);  break;   //76.1G
+       case  BAND122G : GPIO_Out(DECODE_BAND122G); break;   //122G
+    }
+}
+
+void GPIO_Out(uint8_t pattern)
+{
+    DPRINTF("GPIO_Out: pattern:  DEC "); DPRINT(pattern);
+    DPRINTF("  HEX "); DPRINT(pattern, HEX);
+    DPRINTF("  Binary "); DPRINTLN(pattern, BIN);
+    
+    // mask each bit and apply the 1 or 0 to the assigned pin
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_0, pattern & 0x01);  // bit 0
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_1, pattern & 0x02);  // bit 1
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_2, pattern & 0x04);  // bit 2
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_3, pattern & 0x08);  // bit 3
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_4, pattern & 0x10);  // bit 4
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_5, pattern & 0x20);  // bit 5
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_6, pattern & 0x40);  // bit 6
+    digitalWrite(BAND_DECODE_OUTPUT_PIN_7, pattern & 0x80);  // bit 7
+}
+
+void Decoder_GPIO_Pin_Setup(void)
+{
+    // using 8 bits since the ouput pattern is 1 byte.  Can use thenm any way you want. 
+    // The pins used here are defined in RadioConfig.  The one GPIO_SWx_PIN were designated as hardware switches in the Teensy SDR 
+    // If using the Teensy SDR motherboard and you have physical switch hardware on any of these then you need to pick alernate pins.
+    // Most pins are alrewady goiven a #define bname in RadioCOnfig, substitute the right ones in here.  Make sure they are free.
+    pinMode(BAND_DECODE_OUTPUT_PIN_0, OUTPUT);  // bit 0
+    pinMode(BAND_DECODE_OUTPUT_PIN_1, OUTPUT);  // bit 1
+    pinMode(BAND_DECODE_OUTPUT_PIN_2, OUTPUT);  // bit 2
+    pinMode(BAND_DECODE_OUTPUT_PIN_3, OUTPUT);  // bit 3
+    pinMode(BAND_DECODE_OUTPUT_PIN_4, OUTPUT);  // bit 4
+    pinMode(BAND_DECODE_OUTPUT_PIN_5, OUTPUT);  // bit 5
+    pinMode(BAND_DECODE_OUTPUT_PIN_6, OUTPUT);  // bit 6
+    pinMode(BAND_DECODE_OUTPUT_PIN_7, OUTPUT);  // bit 7
+    
+    DPRINTLNF("Decoder_GPIO_Pin_Setup: Pin Mode Setup complete");
 }

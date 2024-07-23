@@ -107,4 +107,28 @@ Now decoding radio and filter setting messages from the radio. The mode is now d
 
 7/20/2024 : Mode and Filter control sync to radio both directions.  Filters changed to FIL1, FIL2, FIL3. Mode list on remote now has XXX-D for appropropriate modes (LSB-D, USB-D, AM-D, FM-D). Jsut spin the encoder to set the radio to teh last known mode and filter and data. DATA mode status icon updates anytime a -D mode is active. Modified the bandmem table to record filter anbd data for each VFO and mode (3 per band). Also for the current band the modelist table stores the current filters associated with each mode. The current mode/filter/data is stored per band. When possible the radio mode/filt/data is retrieved first. At startup I read all 3 band stack filters for each of the radios bands. Any transverter bands will use the table defaults to start with. This helps populate the per band settings to be closer to the radio stored values. This will need to be extended for IC705.  Other things like the bandstack message frequency digits (5 vs 6 bytes long) for will change as well.
 
-7/23/2024 : Major fixes for ATTN, Preamp operation and their buttons and icons. Turning on one turns off the other. Much work was put into tracking down CI-V bus message errors. Some required delays, most are because they are not applicable in a certain scenario of band and/or mode. On bands > 1296 Preamp and ATTN are not used. For modes some filters or AGC settings are not allowed. Changing modes, filters, or AGC now updates relative to each other and for band. Basically you have a set of allowed values per mode, per band. Almost all settings come from the radio now, not the local dB. They are still stored on the SD card (if available or enabled). At startup the major parameters are collected from the radio. Some radio side changes like AGC, Preamp, and ATTN do not send out a CI=V message on change, you have to query for it. I currently only check on band change. Ideally periodic queries for these type settings would be sent. The Clock can display at local or UTC time. Time and offset comes from a CI-V query along with Lat and Long. Time displayed at UTC or Local is configurable in RadioConfig.h with #define UTC. Can calculate grid square and display it somewhere.
+7/23/2024 : Major fixes for ATTN, Preamp operation and their buttons and icons. Turning on one turns off the other. Much work was put into tracking down CI-V bus message errors. Some required delays, most are because they are not applicable in a certain scenario of band and/or mode. On bands > 1296 Preamp and ATTN are not used. For modes some filters or AGC settings are not allowed. Changing modes, filters, or AGC now updates relative to each other and for band. Basically you have a set of allowed values per mode, per band. Almost all settings come from the radio now, not the local dB. They are still stored on the SD card (if available or enabled). At startup the major parameters are collected from the radio. Some radio side changes like AGC, Preamp, and ATTN do not send out a CI=V message on change, you have to query for it. I currently only check on band change. Ideally periodic queries for these type settings would be sent. The Clock can display at local or UTC time. Time and offset comes from a CI-V query along with Lat and Long. Time displayed at UTC or Local is configurable in RadioConfig.h with #define UTC. Can calculate grid square and display it somewhere.   
+
+Added GPIO band decoder output on 8 pins following the Elecraft BCD pattern on the lower 4 bit (0-3). Bit 4 signals HF or VHF bit group (0-3) since some are the same between them.  Configure these pins to be any pattern you want in new RadioConfig.h section with #defines like this:
+
+    #define DECODE_BAND160M     (0x01)   //160M 
+    #define DECODE_BAND80M      (0x02)    //80M
+    #define DECODE_BAND60M      (0x00)    //60M
+
+and so on to 122G band.
+
+The GPIO pins are also defined in RadioConfig.h Look for a section that looks like this:
+
+#define BAND_DECODE_OUTPUT_PIN_0    GPIO_SW4_PIN     // bit 0
+#define BAND_DECODE_OUTPUT_PIN_1    GPIO_SW5_PIN     // bit 1
+#define BAND_DECODE_OUTPUT_PIN_2    GPIO_SW6_PIN     // bit 2
+
+The IO pins number themselves are assigned in the motherboard definitions also in RadioConfig.h - Here is a small bit of it:
+
+	#define PTT_OUT1      		   41   	// buffered GPIO digital output pin number for external PTT.  Typically LO (GND) = TX, HI = RX.
+	#define GPIO_SW1_PIN            3   	// pin assignment for external switches. When enabled, these will be scanned and software debounced
+	#define GPIO_SW2_PIN            4   	// Rev 2 PCBs have an 8x2 header U7 that has Teensy GPIO pins 0-7 on it.  
+	#define GPIO_SW3_PIN            5		  // Pins 0 and 1 I try to reserve for hardware serial port duties so assigning pins 2 through 7.
+
+In my shack I can wire this directly to my existing opto-coupler shack band decoder and program that do do about anything with over 20 opto-coupler outputs.
+For simpler tripod microwave outings with the IC-905 I can package a headless T4.0 in a snmall case and add a suitable interface transistors to drive antenna relays and switch PTT to the right amp.

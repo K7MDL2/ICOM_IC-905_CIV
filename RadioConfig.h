@@ -481,6 +481,48 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
   #endif
 
 #endif // K7MDL_BUILD
+
+// BAND DECODE OUPUT PINS
+// Assign your pins of choice.  Use a number or one of the existing #define number names
+// Make sure they are not mionitored by teh code as a button or other use like and encoder.
+#define BAND_DECODE_OUTPUT_PIN_0    GPIO_SW4_PIN     // bit 0
+#define BAND_DECODE_OUTPUT_PIN_1    GPIO_SW5_PIN     // bit 1
+#define BAND_DECODE_OUTPUT_PIN_2    GPIO_SW6_PIN     // bit 2
+#define BAND_DECODE_OUTPUT_PIN_3    GPIO_ENC3_PIN_A     // bit 3
+#define BAND_DECODE_OUTPUT_PIN_4    GPIO_ENC3_PIN_B     // bit 4
+#define BAND_DECODE_OUTPUT_PIN_5    GPIO_ENC3_PIN_SW     // bit 5
+#define BAND_DECODE_OUTPUT_PIN_6    GPIO_GPS_TX_PIN  // bit 6
+#define BAND_DECODE_OUTPUT_PIN_7    GPIO_GPS_RX_PIN  // bit 7
+
+
+// Band Decode Output patterns.
+// By default using BCD pattern following the Elecraft K3 HF-TRN table.  5 bits are used. Bit 4 =1 is VHF+ group
+#define DECODE_BAND160M     (0x01)   //160M 
+#define DECODE_BAND80M      (0x02)    //80M
+#define DECODE_BAND60M      (0x00)    //60M
+#define DECODE_BAND40M      (0x03)    //40M
+#define DECODE_BAND30M      (0x04)    //30M
+#define DECODE_BAND20M      (0x05)    //20M
+#define DECODE_BAND17M      (0x06)    //17M      
+#define DECODE_BAND15M      (0x07)    //15M
+#define DECODE_BAND12M      (0x08)    //12M
+#define DECODE_BAND10M      (0x09)    //10M
+#define DECODE_BAND6M       (0x0A)    //6M
+//#define DECODE_BAND70       (0x01)    //70MHz
+#define DECODE_BAND144      (0x12)    //2M
+#define DECODE_BAND222      (0x13)    //222
+#define DECODE_BAND432      (0x14)    //432
+#define DECODE_BAND902      (0x15)    //902
+#define DECODE_BAND1296     (0x16)    //1296
+#define DECODE_BAND2400     (0x17)    //2400
+#define DECODE_BAND3400     (0x18)    //3400
+#define DECODE_BAND5760     (0x19)    //5760M
+#define DECODE_BAND10G      (0x1A)    //10.368.1G
+#define DECODE_BAND24G      (0x1B)    //24.192G
+#define DECODE_BAND47G      (0x1C)    //47.1G
+#define DECODE_BAND76G      (0x1D)    //76.1G
+#define DECODE_BAND122G     (0x1E)    //122G
+#define DECODE_GENERAL      (0x1F)     // Non-Ham Band
                                                                                                                
 #ifdef I2C_ENCODERS
   #if I2C_ENC1_ENABLE > 0

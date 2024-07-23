@@ -351,18 +351,18 @@ struct User_Settings user_settings[USER_SETTINGS_NUM] = {
 struct EncoderList encoder_list[NUM_AUX_ENCODERS] {
 //type          id    enabled            def_MF   enca         a_active    encb            enc1_tap         enc1_press
     {GPIO_ENC,  0,    GPIO_VFO_ENABLE,   MFTUNE,  NONE,        NONE,       NONE,           NONE,            NONE},       // Set VFO def_MF to MFTUNE in case there are no encoders
-    {GPIO_ENC,  0,    GPIO_ENC2_ENABLE,  NONE,    MFTUNE,      ON,         MENU_BTN,       SW1_BTN,         PREAMP_BTN},   // encoder events start slot sreach at 1 so skip VFO slot 0.
+    {GPIO_ENC,  0,    GPIO_ENC2_ENABLE,  NONE,    MFTUNE,      ON,         MENU_BTN,       SW1_BTN,         PREAMP_BTN}, // encoder events start slot sreach at 1 so skip VFO slot 0.
     #if defined USE_RA8875 && defined K7MDL_BUILD
     {I2C_ENC,   2,    I2C_ENC1_ENABLE,   NONE,    AFGAIN_BTN,  ON,         RFGAIN_BTN,     SW2_BTN,         MUTE_BTN},    // enc slot 2
     {I2C_ENC,   3,    I2C_ENC2_ENABLE,   MFTUNE,  MFTUNE,      ON,         FILTER_BTN,     SW3_BTN,         NB_BTN},  // enc slot 3
     #else
-    {I2C_ENC,   2,    I2C_ENC1_ENABLE,   NONE,    AFGAIN_BTN,  ON,         ATTN_BTN,       SW2_BTN,         MUTE_BTN},    // enc slot 2
-    {I2C_ENC,   3,    I2C_ENC2_ENABLE,   NONE,    FILTER_BTN,  ON,         MODE_BTN,       SW3_BTN,         NB_BTN},  // enc slot 3
+    {I2C_ENC,   2,    I2C_ENC1_ENABLE,   NONE,    AFGAIN_BTN,  ON,         RFGAIN_BTN,     SW2_BTN,         MUTE_BTN},   // enc slot 2
+    {I2C_ENC,   3,    I2C_ENC2_ENABLE,   NONE,    FILTER_BTN,  ON,         MODE_BTN,       SW3_BTN,         AGC_BTN},     // enc slot 3
     #endif
-    {I2C_ENC,   4,    I2C_ENC3_ENABLE,   NONE,    PAN_BTN,     ON,         ZOOM_BTN,       SW4_BTN,         PREAMP_BTN},   // enc slot 4
-    {I2C_ENC,   5,    I2C_ENC4_ENABLE,   MFTUNE,  MFTUNE,      ON,         RIT_BTN,        SW5_BTN,         RIT_BTN},         // enc slot 5
-    {GPIO_SW,   6,    GPIO_SW1_ENABLE,   NONE,    NONE,        ON,         NONE,           BANDUP_BTN,      BAND_BTN},  // enc slot 6
-    {GPIO_SW,   7,    GPIO_SW2_ENABLE,   NONE,    NONE,        ON,         NONE,           BANDDN_BTN,      XMIT_BTN},    // enc slot 7
+    {I2C_ENC,   4,    I2C_ENC3_ENABLE,   NONE,    RIT_BTN,     ON,         XIT_BTN,        SW4_BTN,         XMIT_BTN},   // enc slot 4
+    {I2C_ENC,   5,    I2C_ENC4_ENABLE,   MFTUNE,  MFTUNE,      ON,         BAND_BTN,       SW5_BTN,         BAND_BTN},   // enc slot 5
+    {GPIO_SW,   6,    GPIO_SW1_ENABLE,   NONE,    NONE,        ON,         NONE,           BANDUP_BTN,      PREAMP_BTN},   // enc slot 6
+    {GPIO_SW,   7,    GPIO_SW2_ENABLE,   NONE,    NONE,        ON,         NONE,           BANDDN_BTN,      ATTN_BTN},   // enc slot 7
     {GPIO_SW,   8,    GPIO_SW3_ENABLE,   NONE,    NONE,        ON,         NONE,           RATE_BTN,        FINE_BTN},   // enc slot 8
     {GPIO_SW,   9,    GPIO_SW4_ENABLE,   NONE,    NONE,        ON,         NONE,           NONE,            NONE},       // enc slot 9
     {GPIO_SW,   10,   GPIO_SW5_ENABLE,   NONE,    NONE,        ON,         NONE,           NONE,            NONE},       // enc slot 10
