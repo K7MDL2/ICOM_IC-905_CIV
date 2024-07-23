@@ -696,8 +696,8 @@ COLD void Button_Handler(int16_t x, uint16_t y, uint8_t _holdtime)
                 switch (i)
                 {
                     case NB_BTN:        setNB(1);       break; //Increment the mode from current value           
-                    case AGC_BTN:       AGC(0);         break;   
-                    case ATTN_BTN:      setAttn(3);    break; // 3 if on, adjust value, 2 = toggle state, 1 is set, 1 is off, -1 use current      
+                    case AGC_BTN:       AGC(1);         break;   
+                    case ATTN_BTN:      setAttn(3);     break; // 3 if on, adjust value, 2 = toggle state, 1 is set, 1 is off, -1 use current      
                     case SMETER_BTN:    setRFgain(1);   break;
                     case PAN_BTN:       setPAN(3);      break;  // set pan to center
                     case RIT_BTN:       setRIT(3);      break;
@@ -737,9 +737,9 @@ COLD void Button_Handler(int16_t x, uint16_t y, uint8_t _holdtime)
                     case MODE_LBL:      setMode(0);     break; //Increment the mode from current value
                     case FILTER_LBL:    Filter(0);      break;
                     case RATE_LBL:      Rate(0);        break;
-                    case AGC_LBL:       AGC(2);         break;
+                    case AGC_LBL:       AGC(0);         break;
                     case ANT_LBL:       Ant();          break;
-                    case ATTN_LBL:      setAttn(2);    break;
+                    case ATTN_LBL:      setAttn(2);     break;
                     case RIT_LBL:       setRIT(2);      break;
                     case XIT_LBL:       setXIT(2);      break;
                     case NB_LBL:        setNB(2);       break;
@@ -799,12 +799,12 @@ void Button_Action(uint16_t button_name)
             case MODE_BTN:      setMode(0);     break; //Increment the mode from current value
             case FILTER_BTN:    Filter(0);      break;
             case RATE_BTN:      Rate(0);        break; //Increment from current value 
-            case AGC_BTN:       AGC(2);         break;
+            case AGC_BTN:       AGC(0);         break;
             case ANT_BTN:       Ant();          break;                    
             case MUTE_BTN:      Mute();         break;
             case MENU_BTN:      Menu();         break;
             case VFO_AB_BTN:    VFO_AB();       break; // VFO A and B Switching button - Can touch the A/B button or the Frequency Label itself to toggle VFOs
-            case ATTN_BTN:      setAttn(2);    break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
+            case ATTN_BTN:      setAttn(2);     break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
             case PREAMP_BTN:    Preamp(2);      break; // 2 = toggle state, 1 is set, 1 is off, -1 use current
             case RIT_BTN:       setRIT(2);      break;
             case XIT_BTN:       setXIT(2);      break;

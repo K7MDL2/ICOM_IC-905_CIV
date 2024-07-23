@@ -10,17 +10,17 @@
 
 struct Band_Memory bandmem[BANDS] = {
     // name         lower     upper         VFOA    Md_A filtA  dataA          VFOA-1  mode1 filt1  data 1        VFOA-2    mode2 filt2  data2            VFOB   modeB filt  varfil bandnum   ts agc    SPLIT RT  XT ATU ANT   BPF ATTN   AttByp att_DB   PREAMP   SSPL  bmap  XV#     Xvtr_IF  XPwr DialCal Decode
-    {"160M",     1800000,     2000000,     1840000, USB, FILT2, DATA_OFF,      1860000, LSB, FILT1, DATA_OFF,      1910000,  LSB, FILT1, DATA_OFF,      1860000, LSB, BW3_2, 3200,  BAND160M, 1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 0,  ATTN_OFF,  0,   20,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,    0,  0xFFFF},
-    { "80M",     3500000,     4000000,     3573000, USB, FILT1, DATA_OFF,      3868000, LSB, FILT1, DATA_OFF,      3813000,  LSB, FILT1, DATA_OFF,      3868000, LSB, BW3_2, 3200,  BAND80M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 1,  ATTN_OFF,  0,   20,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "60M",     4990000,     5405000,     5000000, AM,  FILT1, DATA_OFF,      5287200, LSB, FILT1, DATA_OFF,      5364700,  LSB, FILT1, DATA_OFF,      5405000, USB, BW6_0, 6000,  BAND60M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 2,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "40M",     7000000,     7300000,     7074000, USB, FILT1, DATA_OFF,      7030000, CW,  FILT2, DATA_OFF,      7200000,  LSB, FILT1, DATA_OFF,      7200000, LSB, BW3_2, 3200,  BAND40M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT2, 3,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "30M",     9990000,    10150000,    10000000, AM,  FILT1, DATA_OFF,     10136000, USB, FILT1, DATA_OFF,     10130000,  CW,  FILT2, DATA_OFF,     10136000, USB, BW6_0, 6000,  BAND30M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 4,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "20M",    14000000,    14350000,    14074000, USB, FILT1, DATA_OFF,     14030000, CW,  FILT1, DATA_OFF,     14200000,  USB, FILT1, DATA_OFF,     14200000, USB, BW4_0, 4000,  BAND20M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT2, 5,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "17M",    18068000,    18168000,    18100000, USB, FILT1, DATA_OFF,     18135000, USB, FILT1, DATA_OFF,     18090000,  CW,  FILT2, DATA_OFF,     18135000, USB, BW3_2, 3200,  BAND17M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 6,  ATTN_ON,   1,   14,  PREAMP_ON,   5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "15M",    21000000,    21450000,    21074000, USB, FILT1, DATA_OFF,     21030000, CW,  FILT1, DATA_OFF,     21300000,  USB, FILT1, DATA_OFF,     21350000, USB, BW3_2, 3200,  BAND15M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 7,  ATTN_ON,   1,    3,  PREAMP_ON,   5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "12M",    24890000,    24990000,    24915000, USB, FILT1, DATA_OFF,     24892000, CW,  FILT1, DATA_OFF,     24950000,  USB, FILT1, DATA_OFF,     24904000, USB, BW3_2, 3200,  BAND12M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 8,  ATTN_ON,   1,    3,  PREAMP_ON,   5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    { "10M",    28000000,    29600000,    28074000, USB, FILT1, DATA_OFF,     28200000, USB, FILT1, DATA_OFF,     29400000,  USB, FILT2, DATA_OFF,     28200000, USB, BW4_0, 4000,  BAND10M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 9,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  ON,   NONE,    NONE,    100,   -0,  0xFFFF},
-    {  "6M",    50000000,    54000000,    50125000, USB, FILT1, DATA_OFF,     50313000, USB, FILT1, DATA_OFF,     50100000,  CW,  FILT2, DATA_OFF,     50313000, USB, BW3_2, 3200,  BAND6M,   1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  ON,   XVTR1,   BAND10M,  30,   -0,  0x0001},
+    {"160M",     1800000,     2000000,     1840000, USB, FILT2, DATA_OFF,      1860000, LSB, FILT1, DATA_OFF,      1910000,  LSB, FILT1, DATA_OFF,      1860000, LSB, BW3_2, 3200,  BAND160M, 1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 0,  ATTN_OFF,  0,   20,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,    0,  0xFFFF},
+    { "80M",     3500000,     4000000,     3573000, USB, FILT1, DATA_OFF,      3868000, LSB, FILT1, DATA_OFF,      3813000,  LSB, FILT1, DATA_OFF,      3868000, LSB, BW3_2, 3200,  BAND80M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 1,  ATTN_OFF,  0,   20,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "60M",     4990000,     5405000,     5000000, AM,  FILT1, DATA_OFF,      5287200, LSB, FILT1, DATA_OFF,      5364700,  LSB, FILT1, DATA_OFF,      5405000, USB, BW6_0, 6000,  BAND60M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 2,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "40M",     7000000,     7300000,     7074000, USB, FILT1, DATA_OFF,      7030000, CW,  FILT2, DATA_OFF,      7200000,  LSB, FILT1, DATA_OFF,      7200000, LSB, BW3_2, 3200,  BAND40M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT2, 3,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "30M",     9990000,    10150000,    10000000, AM,  FILT1, DATA_OFF,     10136000, USB, FILT1, DATA_OFF,     10130000,  CW,  FILT2, DATA_OFF,     10136000, USB, BW6_0, 6000,  BAND30M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 4,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "20M",    14000000,    14350000,    14074000, USB, FILT1, DATA_OFF,     14030000, CW,  FILT1, DATA_OFF,     14200000,  USB, FILT1, DATA_OFF,     14200000, USB, BW4_0, 4000,  BAND20M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT2, 5,  ATTN_OFF,  0,   10,  PREAMP_OFF,  5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "17M",    18068000,    18168000,    18100000, USB, FILT1, DATA_OFF,     18135000, USB, FILT1, DATA_OFF,     18090000,  CW,  FILT2, DATA_OFF,     18135000, USB, BW3_2, 3200,  BAND17M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 6,  ATTN_ON,   1,   14,  PREAMP_ON,   5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "15M",    21000000,    21450000,    21074000, USB, FILT1, DATA_OFF,     21030000, CW,  FILT1, DATA_OFF,     21300000,  USB, FILT1, DATA_OFF,     21350000, USB, BW3_2, 3200,  BAND15M,  3, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 7,  ATTN_ON,   1,    3,  PREAMP_ON,   5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "12M",    24890000,    24990000,    24915000, USB, FILT1, DATA_OFF,     24892000, CW,  FILT1, DATA_OFF,     24950000,  USB, FILT1, DATA_OFF,     24904000, USB, BW3_2, 3200,  BAND12M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 8,  ATTN_ON,   1,    3,  PREAMP_ON,   5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    { "10M",    28000000,    29600000,    28074000, USB, FILT1, DATA_OFF,     28200000, USB, FILT1, DATA_OFF,     29400000,  USB, FILT2, DATA_OFF,     28200000, USB, BW4_0, 4000,  BAND10M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 9,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  OFF,   NONE,    NONE,    100,   -0,  0xFFFF},
+    {  "6M",    50000000,    54000000,    50125000, USB, FILT1, DATA_OFF,     50313000, USB, FILT1, DATA_OFF,     50100000,  CW,  FILT2, DATA_OFF,     50313000, USB, BW3_2, 3200,  BAND6M,   1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  OFF,   XVTR1,   BAND10M,  30,   -0,  0x0001},
     { "144",   144000000,   148000000,   144200000, USB, FILT2, DATA_OFF,    144200000, USB, FILT1, DATA_OFF,    144200000,  CW,  FILT1, DATA_OFF,    144200000, USB, BW3_2, 3200,  BAND144,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_ON,   1,    3,  PREAMP_ON,   5,  ON,   NONE,    NONE,     10,   -0,  0x0002},
     { "222",   222000000,   225000000,   222100000, USB, FILT2, DATA_OFF,    222100000, USB, FILT1, DATA_OFF,    222100000,  CW,  FILT1, DATA_OFF,    222100000, USB, BW3_2, 3200,  BAND222,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_OFF,  0,    0,  PREAMP_OFF,  5,  OFF,  XVTR3,   BAND10M,  10,  -10,  0x0004},
     { "432",   430000000,   450000000,   432100000, USB, FILT2, DATA_OFF,    432100000, USB, FILT1, DATA_OFF,    432100000,  CW,  FILT1, DATA_OFF,    432100000, USB, BW3_2, 3200,  BAND432,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_OFF,  0,    0,  PREAMP_OFF,  5,  ON,   NONE,    NONE,     40,  -10,  0x0008},
@@ -169,7 +169,7 @@ struct Band_Memory bandmem[BANDS] = {
         { ON,  ON, 1, 1, x_1, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLACK, BLACK, 20, 20, MODE_LBL,   "Mode\0"},
         { ON,  ON, 1, 2, x_2, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLACK, BLACK, 21, 20, FILTER_LBL, "Filter\0"},
         { ON,  ON, 1, 3, x_3, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLACK, BLACK, 24, 20, RATE_LBL,   "Rate\0"},
-        { ON,  ON, 1, 4, x_4, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLUE,  BLACK, 4,  20, ATTN_LBL,  "ATT\0"},
+        { ON,  ON, 1, 4, x_4, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLUE,  BLACK, 23,  20, ATTN_LBL,   "ATT\0"},
         { ON,  ON, 1, 5, x_5, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLUE,  BLACK, 23, 20, PREAMP_LBL, "PRE\0"},
         { OFF, ON, 1, 6, x_6, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLACK, BLACK, 20, 20, BAND_LBL,   "Band\0"},
         //{ OFF, ON, 1, 7, x_7, y_1, w_1, h_1, r_1, LIGHTGREY, LIGHTGREY, BLACK, BLACK, 20, 20, "Band1\0"},
@@ -287,14 +287,14 @@ struct Label labels[LABEL_NUM] = {
     {OFF,  ON, 210, 110,  85, 28, 3, BLACK,   myDKPINK,     BLACK,      myDKYELLOW,      BLACK, 4, 7, "\0"},
     {OFF,  ON, 150,  35,  74, 22, 3, BLACK,     WHITE,      BLACK,      myVDARKGREY,     BLACK, 5, 4, "AGC-\0"},
     {OFF,  ON,  10,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       WHITE,           BLACK, 6, 4, "ANT-\0"}, 
-    {OFF,  ON, 303, 110,  60, 28, 3, BLACK,     DARKCYAN,   BLACK,      myVDARKGREY,     BLACK, 4, 7, "A:\0"},
+    {OFF,  ON, 303, 110,  60, 28, 3, BLACK,     DARKCYAN,   BLACK,      myVDARKGREY,     BLACK, 10, 7,"ATT\0"},
     {OFF,  ON,  10,   5,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 9, 4, "PRE\0"},
-    {OFF,  ON,  80,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 10, 4, "ATU\0"},
+    {OFF,  ON,  80,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 10, 4,"ATU\0"},
     {OFF,  ON, 371, 110,  90, 28, 3, BLACK,   myMIDGREEN,   BLACK,      myVDARKGREY,     BLACK, 4, 7, "RT:\0"},
     {OFF,  ON, 469, 110,  90, 28, 3, BLACK,   myDARKRED,    BLACK,      myVDARKGREY,     BLACK, 4, 7, "XT:\0"},
     {OFF,  ON,  10,  65,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 7, 4, "FINE\0"},
-    {OFF,  ON, 150,   5,  74, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 14, 4, "NB:0\0"},
-    {OFF,  ON,  80,   5,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 16, 4, "NR\0"},
+    {OFF,  ON, 150,   5,  74, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 14, 4,"NB:0\0"},
+    {OFF,  ON,  80,   5,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 16, 4,"NR\0"},
     {OFF,  ON, 150,  65,  74, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 4, 4, "NOTCH\0"},
     {OFF,  ON, 244,  65,  84, 22, 3, BLACK,     GREEN,      BLACK,      myVDARKGREY,     BLACK, 3, 4, "Split\0"},
     {OFF, OFF, 699, 419, 100, 22, 3, BLACK,     GREEN,      BLACK,      myVDARKGREY,     BLACK, 3, 4, "Mute\0"}, // No label on screen for this today
@@ -306,7 +306,7 @@ struct Label labels[LABEL_NUM] = {
     {OFF,  ON, 225, 110,  85, 28, 3, BLACK,     BLUE,       BLACK,      myDKYELLOW,      BLACK,  7, 7, "\0"},
     {OFF,  ON, 150,  35,  74, 22, 3, BLACK,     WHITE,      BLACK,      myVDARKGREY,     BLACK,  5, 4, "AGC-\0"},
     {OFF, OFF,  10,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       WHITE,           BLACK,  6, 4, "ANT-\0"}, 
-    {OFF,  ON, 325, 110,  85, 28, 3, BLACK,   myDARKBLUE,   BLACK,      myVDARKGREY,     BLACK,  4, 7, "ATT:\0"},
+    {OFF,  ON, 325, 110,  60, 28, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 14, 7, "ATT\0"},
     {OFF,  ON,  10,   5,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK,  9, 4, "PRE\0"},
     {OFF, OFF,  80,  35,  60, 22, 3, BLACK,     WHITE,      NAVY,       myVDARKGREY,     BLACK, 10, 4, "ATU\0"},
     {OFF,  ON, 425, 110,  96, 28, 3, BLACK,   myVDARKGREEN, BLACK,      myVDARKGREY,     BLACK,  4, 7, "RIT:+0000\0"},
@@ -395,10 +395,10 @@ struct Frequency_Display disp_Freq[FREQ_DISP_NUM] = {
 // decay how fast gain is restored once level drops below threshold in dB/s - typically set longer than attack value
 PROGMEM struct AGC agc_set[AGC_SET_NUM] = {
     //2,1,0,-5,0.5,0.5 from example file
-    {"AGC- ", 0, 0, 0,  0, 0.0f,  0.0f},  
-    {"AGC-S", 1, 1, 0, -5, 0.2f,  0.1f},
-    {"AGC-M", 1, 0, 0, -10, 0.4f,  0.3f},
-    {"AGC-F", 1, 0, 0, -16, 0.8f,  0.6f}
+    {"AGC- ", 0, 0, 0,  0, 0.0f,  0.0f},  // 0 reserved for AGC OFF
+    {"AGC-F", 1, 0, 0, -16, 0.8f,  0.6f},  // 1
+    {"AGC-M", 1, 0, 0, -10, 0.4f,  0.3f},  // 2
+    {"AGC-S", 1, 1, 0, -5, 0.2f,  0.1f}   //3
 };
 
 // Settings ranges.5 and 20, closer to 3 maybe best

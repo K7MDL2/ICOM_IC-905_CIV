@@ -251,7 +251,7 @@ COLD void displayFilter(void)
 		extern int16_t filterWidth;
 		sprintf(str, "F: %dHz", filterWidth);	
 	#else
-		sprintf(str, "F:%s", filter[bandmem[curr_band].filter_A].Filter_name);	
+		sprintf(str, "%s", filter[bandmem[curr_band].filter_A].Filter_name);	
 	#endif
 	//DPRINTF("Filter is "); DPRINTLN(str);
 	sprintf(labels[FILTER_LBL].label, "%s", str);
@@ -393,29 +393,8 @@ COLD void displayAttn()
 {
 	if (popup) return;  // Do not write to the screen when a window is active
 
-	char string[10];   // print format stuff
-	#ifdef USE_RA8875
-		sprintf(string, "A:%d", bandmem[curr_band].attenuator_dB);
-		if (bandmem[curr_band].attenuator_dB == 100)
-			sprintf(std_btn[ATTEN_BTN].label, " %s", string);
-		else
-			sprintf(std_btn[ATTEN_BTN].label, "  %s", string);
-	#else
-		snprintf(string, 10, "ATT:%3d", bandmem[curr_band].attenuator_dB);
-		snprintf(std_btn[ATTN_BTN].label, 10, "%3s", string);
-	#endif
-	snprintf(labels[ATTN_LBL].label, 10, "%3s", string);
-	
-	//DPRINTF("displayAttn: Attn is "); DPRINT(bandmem[curr_band].attenuator); DPRINTF(" Level is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
-	
-	drawLabel(ATTN_LBL, &bandmem[curr_band].attenuator_byp);
-	draw_2_state_Button(ATTN_BTN, &bandmem[curr_band].attenuator_byp);
-
-	if (MF_client == ATTN_BTN) 
-	{ 
-        MeterInUse = true;
-    	displayMeter(bandmem[curr_band].attenuator_dB/10, string, 5);   // val, string label, color scheme               
-	}
+	drawLabel(ATTN_LBL, &bandmem[curr_band].attenuator);
+	draw_2_state_Button(ATTN_BTN, &bandmem[curr_band].attenuator);
 }
 
 COLD void displayPreamp()
@@ -512,7 +491,7 @@ COLD void displayXVTR()
 		drawLabel(XVTR_LBL, &xvtr);   // no room on the 4.3" so draw only for RA8876
 	#endif
 	draw_2_state_Button(XVTR_BTN,  &xvtr);
-	DPRINTF("displayXVTR: XVTR is "); DPRINTLN(xvtr);
+	//DPRINTF("displayXVTR: XVTR is "); DPRINTLN(xvtr);
 }
 
 COLD void displayNB()
@@ -588,7 +567,7 @@ COLD void displayXMIT()
 {
 	//if (popup) return;
 
-	DPRINTF("displayXMIT: XMIT is "); DPRINTLN(user_settings[user_Profile].xmit);
+	//DPRINTF("displayXMIT: XMIT is "); DPRINTLN(user_settings[user_Profile].xmit);
 
 	drawLabel(XMIT_LBL, &user_settings[user_Profile].xmit);
 	draw_2_state_Button(XMIT_BTN, &user_settings[user_Profile].xmit);		 

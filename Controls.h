@@ -68,5 +68,8 @@ uint8_t get_MY_POSITION_from_Radio(void);
 uint8_t get_RXTX_from_Radio(void);
 uint8_t get_Preamp_from_Radio(void);
 uint8_t get_Attn_from_Radio(void);
+uint8_t get_AGC_from_Radio(void);
+uint8_t send_AGC_to_Radio(void);
+uint64_t get_Freq_from_Radio(void);
 
 #endif  // _CONTROLS_H_

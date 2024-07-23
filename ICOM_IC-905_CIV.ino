@@ -132,6 +132,7 @@ COLD time_t getTeensy3Time();
 COLD void I2C_Scanner(void);
 HOT  void Check_Encoders(void);
 HOT  void Check_GPIO_Switches(void);
+HOT  uint8_t Check_radio(void);
 COLD void init_band_map(void);
 HOT  bool GPIO_Sw_read(bool sw_pushed, uint8_t sw_pin, uint8_t slot);
 //COLD void Change_FFT_Size(uint16_t new_size, float new_sample_rate_Hz);
@@ -184,7 +185,7 @@ Metro gpio_ENC2_Read_timer = Metro(700);    // time allowed to accumulate counts
 Metro gpio_ENC3_Read_timer = Metro(700);    // time allowed to accumulate counts for slow moving detented encoders
 Metro TX_Timeout           = Metro(180000); // 180000 is 3 minutes for RunawayTX timeout
 Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT comms
-Metro CAT_Poll             = Metro(1000);  // Throttle the servicing for CAT comms
+Metro CAT_Poll             = Metro(5000);  // Throttle the servicing for CAT comms
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
 
@@ -408,9 +409,10 @@ void setup()
                                     // This could be used by the PC during compile to override the RadioConfig.h
 
     // -------- Setup our radio settings and UI layout --------------------------------
-
-    curr_band = user_settings[user_Profile].last_band; // get last band used from user profile.
     PAN(0);
+
+    get_MY_POSITION_from_Radio();
+    delay(100);
 
     // override our defaults with the radio's Bandstack values for each band (3 values per band)
     // transverter bands will use the bandmem table defaults until the radio sends something in use.
@@ -418,11 +420,13 @@ void setup()
     {
         for (int j = 1; j <= 3; j++)
         {
-            if (read_BSTACK_from_Radio(i, j) == 0)  // read band stack reg 1 for 144Mhz to get the mode, filter freq
-                while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
-                    delay(20);
+            read_BSTACK_from_Radio(i, j);
+            //if (read_BSTACK_from_Radio(i, j) == 0)  // read band stack reg 1 for 144Mhz to get the mode, filter freq
+            //    while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
+            //delay(20);
         }
     }
+    delay(100);
 
     //==================================== Frequency Set ==========================================
     #ifdef PANADAPTER
@@ -432,6 +436,9 @@ void setup()
         VFOA = bandmem[curr_band].vfo_A_last;
         VFOB = user_settings[user_Profile].sub_VFO;
     #endif
+    
+    get_Freq_from_Radio();   // get freq from radio, comment this out if you want the remote database stored to rule
+    delay(400);
     DPRINT("Setup: VFOA = "); DPRINTLN(VFOA);
     
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
@@ -455,26 +462,20 @@ void setup()
 
     DPRINTF("\nInitial Dial Frequency is "); DPRINT(formatVFO(VFOA)); DPRINTLNF("MHz");
 
-    //--------------------------   Setup our Audio System -------------------------------------
-    initVfo(); // initialize the si5351 vfo
-    delay(10);
-    //initDSP();
-    // RFgain(0);
+    //initVfo(); // initialize the si5351 vfo
+    
     changeBands(0); // Sets the VFOs to last used frequencies, sets preselector, active VFO, other last-used settings per band.
                     // Call changeBands() here after volume to get proper startup volume
     
     InternalTemperature.begin(TEMPERATURE_NO_ADC_SETTING_CHANGES);
-
+ 
+    draw_2_state_Button(SMETER_BTN, &std_btn[SMETER_BTN].show); // clear out text artifacts
     update_icon_outline(); // update any icons related to active encoders functions  This also calls displayRefresh.
     // displayRefresh();
-
-    get_MY_POSITION_from_Radio();
-    delay(10);
-    get_Preamp_from_Radio();
-    delay(10);
-    get_Attn_from_Radio();
-    delay(10);
 }
+
+//-------------------------- End Setup -------------------------------------
+
 
 void loop()
 {  
@@ -514,51 +515,9 @@ void loop()
         // ----------------------------------  check, whether there is something new from the radio
         //if (time_current_baseloop>t_RadioCheck) 
     time_last_baseloop = time_current_baseloop;
-      
-    //if (CAT_Freq_Check.check() == 1)
-    if (1);
-    {
-        uint64_t VFOA_temp = VFOA;
-        uint8_t ret_val = 0;
-        
-        ret_val = check_CIV(time_current_baseloop);  // got frequency
-
-        if (ret_val == 1) // got frequency
-        {
-            if(VFOA_temp != VFOA)  // Update display if changed
-            {
-            VFOA_temp = VFOA;
-            if (!find_new_band(VFOA, curr_band))  // find band index for VFOA frequency, don't change bands is VFO is in the current band
-                changeBands(0);  // new band
-            displayFreq();   // Update screen
-            }
-        }
-        else if (ret_val == 2)
-        {
-            DPRINTF("Loop: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
-            get_Mode_from_Radio();  // get extened data for DATa on/off state
-        }
-        else if (ret_val == 4)
-        {
-            set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
-            DPRINTF("Loop: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
-        }
-        else if (ret_val == 5)  // RX TX status received
-        {
-            DPRINTF("Loop: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
-            displayXMIT();
-        }
-        else if (ret_val == 6 || ret_val == 7)  // RX TX status received
-        {
-            DPRINTF("Loop: TIME = "); DPRINTLN("time XXXXX");
-            displayTime();
-        }
-    }
 
     //pass_CAT_msg_to_PC();   // civ.readmsg() always does this.
     pass_CAT_msgs_to_RADIO();  // if a PC is connected pass on CAT commands to the RADIO transparently.   At this point no collision handling performed.
-
-    show_CIV_log();
 
     #ifdef DEBUG
         time_sp = millis();
@@ -599,6 +558,10 @@ void loop()
         // VFO.read();             // zero out counter for next read.
         newFreq = 0;
     }
+
+    if (CAT_Poll.check() == 1) show_CIV_log();
+    
+    Check_radio();
 
     #if defined I2C_ENCODERS || defined MECH_ENCODERS
         Check_Encoders();
@@ -1296,7 +1259,7 @@ COLD void MF_Service(int8_t counts, uint8_t knob)
         case AFGAIN_BTN:    AFgain(counts);         break;
         case REFLVL_BTN:    RefLevel(counts*-1);    break;
         case PAN_BTN:       PAN(counts);            break;
-        case ATTN_BTN:      Attn(counts);          break;  // set attenuator level to value in database for this band
+        //case ATTN_BTN:      Attn(counts);          break;  // set attenuator level to value in database for this band
         case NB_BTN:        NBLevel(counts);        break;
         case ZOOM_BTN:      if (counts > 0) counts =  1;
                             if (counts < 0) counts = -1;
@@ -1358,7 +1321,7 @@ COLD void unset_MF_Service(uint8_t old_client_name) // clear the old owner butto
         case REFLVL_BTN:    setRefLevel(-1);    break;
         case PAN_BTN:       setPAN(-1);         break;
         case ZOOM_BTN:      setZoom(-1);        break;
-        case ATTN_BTN:      setAttn(-1);       break;
+        //case ATTN_BTN:      setAttn(-1);       break;
         case NB_BTN:        setNB(-1);          break;
         case RIT_BTN:       setRIT(-1);         break;
         case XIT_BTN:       setXIT(-1);         break;    
@@ -1383,4 +1346,64 @@ COLD void set_MF_Service(uint8_t new_client_name) // this will be the new owner 
     MF_Timeout.reset();          // reset (extend) timeout timer as long as there is activity.
                                  // When it expires it will be switched to default
     // DPRINTF("New MF Knob Client ID is "); DPRINTLN(MF_client);
+}
+
+uint8_t Check_radio(void)
+{
+    static uint64_t VFOA_temp = 0;
+    static uint8_t curr_band_temp = 0;
+    uint8_t ret_val = 0;
+    
+    ret_val = check_CIV(time_current_baseloop);  // got frequency
+
+    if (ret_val) show_CIV_log();
+    
+    if (ret_val == 1) // got frequency
+    {
+        if(VFOA_temp != VFOA)  // Update display if changed
+        {
+            // VFOA is already updated so find_band will see no change in freq so use previous VFO
+            
+            uint64_t bresult = find_new_band(VFOA, curr_band);  // find band index for VFOA frequency, don't change bands is VFO is in the current band
+            PC_Debug_port.printf("Check_radio: Old Freq: %llu  New Freq: %llu  FindBand result: %llu  Old band: %d  new band: %d\n", VFOA_temp, VFOA, bresult, curr_band_temp, curr_band);
+            
+            if (bresult && curr_band_temp != curr_band)   // if 0 then invalid band
+            {   
+                // now have curr_band updated to match the frequency so changebands() can do its work on the rest fo the parameters
+                DPRINT("Check_radio: New Band: "); DPRINTLN(curr_band);DPRINT("  VFOA:"); DPRINTLN(VFOA);
+                changeBands(0);  // set new band using current VFOA and curr_band sicne they are already updated
+            }
+            displayFreq();   // Update screen
+        }
+        VFOA_temp = VFOA;
+        curr_band_temp = curr_band;
+    }
+    else if (ret_val == 2)  // When the radio initiates a band change it sends out basic mode msg followed by frequency
+    // Requeasting a extended (0x26) mode immediately will clobber the frequency message from the radio
+    // the result is both the ext mde and freq are clobbered due to BUS_CONFLICT.
+    // DO the ext mode during band change and not here.  Hard part is knowing. 
+    // A timer may need to be set to wait is do the ext mode to give time to see if this is part of a radio side band change
+    // IF so can cancel the timer in band change and skip this one sicne it will be done there.
+    {
+        DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
+        setMode(3);
+        // sending ext mode request to radio if during a radio side bandchange this reqeast will fail.  Let changeBands do it sicne it follows a band change.
+        //get_Mode_from_Radio();  // get extened data for DATa on/off state
+    }
+    else if (ret_val == 4)
+    {
+        set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
+        DPRINTF("Check_radio: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
+    }
+    else if (ret_val == 5)  // RX TX status received
+    {
+        DPRINTF("Check_radio: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
+        displayXMIT();
+    }
+    else if (ret_val == 6 || ret_val == 7)  // RX TX status received
+    {
+        DPRINTF("Check_radio: TIME = "); DPRINTLN("time XXXXX");
+        displayTime();
+    }
+    return ret_val;
 }

@@ -67,6 +67,7 @@ extern uint8_t getRadioMode(void);
 extern CIV     civ;
 extern CIVresult_t writeMsg (const uint8_t deviceAddr, const uint8_t cmd_body[], const uint8_t cmd_data[],writeMode_t mode);
 extern uint8_t check_CIV(uint32_t time_current_baseloop);
+extern uint8_t Check_radio(void);
 extern uint8_t radio_mode;         // mode from radio messages
 extern uint8_t radio_filter;       // filter from radio messages
 extern uint8_t radio_data;       // filter from radio messages
@@ -142,6 +143,8 @@ void setEncoderMode(uint8_t role);
 // Returns 0 if cannot change bands
 // Returns 1 if success
 
+// For CIV ops, call CHeck_Radio periodically to prevent message buffer filling up.  Seen TXchk * 5 is a clue this has happened
+// In this function many requests are queued up, it will overflow before returning to the main loop to process Check_Radio().
 COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple bandswith value > 1.
 {
     int8_t target_band;
@@ -153,13 +156,14 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 
     target_band = bandmem[curr_band].band_num + direction;
     // target_band = curr_band + direction;
+    
     DPRINTF("changeBands: Proposed Target Band is "); DPRINTLN(bandmem[target_band].band_name);
 
     uint16_t top_band    = BANDS-1;
     uint16_t bottom_band = 0;
 
     // See if the proposed new band is enabled in the bandmap or not.  If not skip to the next one and check again until true.
-    while (1)  // lop around up or down until we find a valid band to switch to.
+    while (1)  // loop around up or down until we find a valid band to switch to.
     {
         if (target_band > top_band)
             target_band = bottom_band;
@@ -207,34 +211,46 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     DPRINTF("changeBands: xvtr_offset is "); DPRINTLN(xvtr_offset);
 
     DPRINTLNF("changeBands: Set RIT if On");
+
+/*  ToDo - Fix up RIT and XIT later
     if (bandmem[curr_band].RIT_en)
         setRIT(1); // turn on if it was on before.   Also calls selectFrequency(0);
     else
         setRIT(0); // turn off if it was off before on this new band
-
-    // Example how and when to output new Band Decoer pattern on output IO pins. Pins assignments TBD.
+*/
+    selectFrequency(0);
+  
+    // Example how and when to output new Band Decoder pattern on output IO pins. Pins assignments TBD.
     // Set the new band decoder output pattern for this band change
 // uint16_t BandDecodePatternByte = bandmem[curr_band].bandDecode;
 
-    DPRINTLNF("changeBands: Set other per band settings");
+    DPRINTLNF("changeBands: Set other related band settings");
     // Split(0);
-    get_Attn_from_Radio();  //sync up with radio
-    setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    
     //selectBandwidth(bandmem[curr_band].filter);
-    // dB level is set elsewhere and uses value in the dB in this function.
+    delay(200);
+    Check_radio();  //Radio will send back a freq if initialed by the remote side so collect it here
+    delay(20);
     get_Preamp_from_Radio(); // sync up with radio
-    Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-    selectAgc(bandmem[curr_band].agc_mode);
+    //Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    //Check_radio();
+    get_Attn_from_Radio();  //sync up with radio
+    //Check_radio();
+    //setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    get_AGC_from_Radio();
+    //Check_radio();
+    //selectAgc(bandmem[curr_band].agc_mode);
+    get_Mode_from_Radio();
+    //Check_radio();
+    //send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
+
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
     AFgain(0);
     NBLevel(0); // 0 just updates things to be current value
     ATU(-1);    // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.
-
-    // when sending a freq on a new band need to also send desired mode else the mode stays the same as old band.
-    DPRINTF("changeBands: Set VFO A Mode to index "); DPRINTLN(bandmem[curr_band].mode_A);   
-    send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
-
+    
+    //delay(10);
     // Rate(0); Not needed
     // Ant() when there is hardware to setup in the future
     // ATU() when there is hardware to setup in the future
@@ -244,7 +260,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     user_settings[user_Profile].last_band = curr_band;
     user_settings[user_Profile].sub_VFO = VFOB;
     
-    write_db_tables();  // Save to SD card
+    //write_db_tables();  // Save to SD card
     displayRefresh();
 
     DPRINTLNF("changeBands: Complete\n");
@@ -256,10 +272,13 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 //
 
 // ---------------------------setMode() ---------------------------
+//   selects old or new value and updates buttons, labels to match
+//
 //   Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
-//          1 = step up 1 mode
-//         -1 = step down 1 mode
-//          2 = use last mode
+//          1 = step up 1 
+//         -1 = step down 1 
+//          2 = use last in dB
+//          3 = set from dB but do not send to radio (read radio and set dB to match)
 //
 COLD void setMode(int8_t dir)
 {
@@ -293,33 +312,42 @@ COLD void setMode(int8_t dir)
             _mndx = MODES_NUM - 1;
 
         if (_mndx < 0) // limit in case of encoder counts
-            _mndx = 0;
+            _mndx = 0;    
 
-        //bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
+        bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
-    //get_Mode_from_Radio(); 
-    //delay(20);
-    
-    //while (check_CIV(millis()))  // give time to respond -  Msg_type 3 is bstack results
-    //    delay(2);
+    // digital modes only allow AGC Fast
+    switch (modeList[bandmem[curr_band].mode_A].mode_num) // loop though the list look for these modes numbers
+    {
+        case 0x22:  bandmem[curr_band].filter_A = FILT1; // in addition to mode restrictions, if mode is DD then only FIL1 allowed
+                    //Filter(2);
+        case 0x17: // these modes only allow FAST so do not change radio, just update local buttons, labels  They do allow filter changes
+        case 0x23:
+        case 0x05:  bandmem[curr_band].agc_mode = AGC_FAST;  // force state to FAST, radio does not auto-report AGC changes
+    }
 
-    send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
+    if (dir < 3)  // Only update radio for local button pushes
+        send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
-    // Update the filter setting per mode
-    //Filter(2);
-    // DPRINTF("Set Mode: ");  DPRINTLN(bandmem[curr_band].mode_A);
     displayMode();
-    selectFrequency(0); // Call in case a mode change requires a frequency offset
+    //selectFrequency(0); // Call in case a mode change requires a frequency offset
+    get_AGC_from_Radio();  // let the radio update to the per mode AGC setting it has
+    get_Attn_from_Radio(); // radio wont tell us it changed so have to ask
+    get_Preamp_from_Radio(); // radio wont tell us it changed so have to ask
 }
 
 // ---------------------------Filter() ---------------------------
-//   Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
+//   selects old or new value and updates buttons, labels to match
+//
+//  Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
 //          1 = step up 1 filter (wider)
 //         -1 = step down 1 filter (narrower)
 //          2 = use last filter width used in this mode (from modeList table)
-//      This is mode-aware. In non-CW modes we will only cycle through SSB width filters as set in the filter tables
-
+//          3 = set from dB but do not send to radio (read radio and set dB to match)
+//
+//  This is mode-aware. In non-CW modes we will only cycle through SSB width filters as set in the filter tables
+//
 // FILTER button
 COLD void Filter(int8_t dir)
 {
@@ -355,11 +383,19 @@ COLD void Filter(int8_t dir)
 
     }
     
+    // DD mode only allow AGC Fast
+    if (modeList[bandmem[curr_band].mode_A].mode_num == 0x22)
+    {
+        _bw = FILT1;
+        dir =3;  // do nto send to radio, it is already there in DD mode
+    }
     modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A = (uint8_t) _bw;
 
     DPRINTF("Set Filter to "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);
-    send_Mode_to_Radio(bandmem[curr_band].mode_A);
-    //displayFilter();
+    if (dir < 3)
+        send_Mode_to_Radio(bandmem[curr_band].mode_A);
+    
+    displayFilter();
 }
 
 // ---------------------------Rate() ---------------------------
@@ -422,23 +458,68 @@ COLD void Rate(int8_t dir)
 }
 
 // AGC button
-// 2 = cycle around
-// -1, 0, +1  cycle up or down or stay the same
+// ---------------------------AGC() ---------------------------
+//   selects old or new value and updates buttons, labels to match
+//.
+//   Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
+//          1 = step up 1 
+//         -1 = step down 1 
+//          2 = use last in dB
+//          3 = set from dB but do not send to radio (read radio and set dB to match)
+//
 COLD void AGC(int8_t dir)
 {
-    int8_t a_md = bandmem[curr_band].agc_mode;
-    a_md += dir;
-    if (a_md < 0) a_md = 0;
-    if (a_md > AGC_SET_NUM - 1) a_md = AGC_SET_NUM - 1;
-
-    if (dir == 2)
-        selectAgc(bandmem[curr_band].agc_mode + 1);
-    else
+    static int8_t direction = 1;
+    int8_t _agc = bandmem[curr_band].agc_mode;
+    
+    if (dir < 2)
     {
-        bandmem[curr_band].agc_mode = (uint8_t)a_md;
-        selectAgc(bandmem[curr_band].agc_mode);
+        // 1. Limit to allowed step range
+        // 2. Cycle up and at top, cycle back down, do not roll over.
+        if (_agc <= AGC_FAST)
+        {
+            _agc       = AGC_FAST; // mode = 0 then change to -1 will add direction == +1 to get 0 later.
+            direction = 1; // cycle upwards
+        }
+
+        if (_agc >= AGC_SLOW)
+        {
+            _agc       = AGC_SLOW;
+            direction = -1; // go downward
+        }
+
+        if (dir == 0)
+            _agc += direction; // Index our step up or down, if dir == 0 then no change to current value
+        else
+            _agc += dir; // forces a step higher or lower then current
+
+        if (_agc > AGC_SLOW) // limit in case of encoder counts setMode
+            _agc = AGC_SLOW;
+
+        if (_agc < AGC_FAST) // limit in case of encoder counts
+            _agc = AGC_FAST;
+            
+        bandmem[curr_band].agc_mode = (uint8_t) _agc;
     }
-    // DPRINTF("Set AGC to "); DPRINTLN(bandmem[curr_band].agc_mode);
+    
+    // digital modes only allow AGC Fast
+    switch (modeList[bandmem[curr_band].mode_A].mode_num) // loop though the list look for these modes numbers
+    {
+        case 0x17: // these modes only allow FAST so do nto change radio, just update local buttons, labels
+        case 0x22:
+        case 0x23:
+        case 0x05:  bandmem[curr_band].agc_mode = AGC_FAST;  // force state to FAST, radio does not auto-report AGC changes
+                    dir = 3;  // send only only if not a digital mode - radio is already in FAST in digital modes
+                    DPRINTLNF("AGC(): Changed AGC to FAST for Digital Modes);");
+                    break;
+    }
+    
+    // dir  > 1 just use the unchanged dB value.  
+    // dir 3 skip sending to radio, just syncing our state to the radio's state
+    if (dir < 3)
+        send_AGC_to_Radio();
+    
+    DPRINTF("Set AGC to "); DPRINTLN(agc_set[bandmem[curr_band].agc_mode].agc_name);
     sprintf(std_btn[AGC_BTN].label, "%s", agc_set[bandmem[curr_band].agc_mode].agc_name);
     sprintf(labels[AGC_LBL].label, "%s", agc_set[bandmem[curr_band].agc_mode].agc_name);
     displayAgc();
@@ -533,22 +614,24 @@ COLD void VFO_AB(void)
     DPRINTLN(VFOB);
 }
 
-//  setAttn 
+// ----------------------------------- setAttn ---------------------------------------------------------
+//  setAttn  - valid on bands < 2400 for IC-905
 //   -1 sets attenuator state to current database value. Used for startup or changing bands.
 //    0 sets attenuator state off
 //    1 sets attenuator state on
 //    2 toggles attenuator state
-//    3 sets meter active and allow adjustment via MF knob
+//    3 set attenuator state to current database value but does nto send to radio (likely came from radio)
+//
 COLD void setAttn(int8_t toggle)
 {
-    CIVresult_t CIVresultL;
+    DPRINTF("setAttn: toggle = "); DPRINTLN(toggle);
+    DPRINTF("setAttn: Attn start state = "); DPRINTLN(bandmem[curr_band].attenuator);
 
-    if (bandmem[curr_band].attenuator_byp == 1 && toggle == 3)
-        toggle = 1;
+    CIVresult_t CIVresultL;
 
     if (toggle == 2) // toggle if ordered, else just set to current state such as for startup.
     {
-        if (bandmem[curr_band].attenuator_byp == 1) // toggle the attenuator tracking state
+        if (bandmem[curr_band].attenuator == ATTN_ON) // toggle the attenuator tracking state
             toggle = 0;
         else
             toggle = 1;
@@ -556,40 +639,54 @@ COLD void setAttn(int8_t toggle)
 
     if (toggle == 1) // toggle is 1, turn on Attn
     {
-        bandmem[curr_band].attenuator_byp = 1;        // Turn relay ON for hardware attenuator
-        bandmem[curr_band].attenuator     = ATTN_ON; // le the attenuator tracking state to ON
-        MeterInUse                        = true;
-        setMeter(ATTN_BTN);
+        bandmem[curr_band].attenuator     = ATTN_ON; // set the attenuator tracking state to ON
     }
 
-    if (toggle == 0)
+    if (toggle == 0 || curr_band > BAND1296)  // preamp and atten not available on IC905 on bands above 1296
     {
-        bandmem[curr_band].attenuator_byp = 0;         // Turn relay off bypassing hardware attenuator
         bandmem[curr_band].attenuator     = ATTN_OFF; // set attenuator tracking state to OFF
     }
 
-    if (toggle == 0 || toggle == -1)
-    {
-        MeterInUse = false;
-        if (toggle != -1) clearMeter();
-    }
+    MeterInUse = false;
 
-    // Set the attenuation level from the value in the database
-    Attn(0);  // 0 = no change to set attenuator level to value in database for this band
+    if (bandmem[curr_band].preamp == PREAMP_ON && bandmem[curr_band].attenuator == ATTN_ON)   // turn off if the preamp is on
+        bandmem[curr_band].preamp = PREAMP_OFF;
 
-    if (bandmem[curr_band].attenuator) 
+
+    DPRINTF("setAttn 2: toggle = "); DPRINTLN(toggle);
+    DPRINTF("setAttn 2: ATTN start state = "); DPRINTLN(bandmem[curr_band].attenuator);
+    DPRINTF("setAttn:2: Preamp state = "); DPRINTLN(bandmem[curr_band].preamp);
+
+
+    // Reading from the radio we just want to update database and screen and not repeat back to radio.
+    // 0 = no change to set attenuator level to value in database for this band
+    
+    if (curr_band < BAND2400)
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_ON].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("Attn_to_Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        if (toggle < 3)
+        {
+            if (bandmem[curr_band].attenuator) 
+            {
+                delay(20);
+                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_ON].cmdData), CIV_D_NIX, CIV_wChk);
+                DPRINTF("setAttn: Send to Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+            }
+            else
+            {
+                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+                DPRINTF("setAttn: Send to Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+            }
+        }
     }
-    else
+    else  // the band is > 1296
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_OFF].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("Attn_to_Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        DPRINTF("setAttn: Skipping for bands > 1296 - curr band is "); DPRINTLN(bandmem[curr_band].band_name);
     }
 
     displayAttn();
+    displayPreamp();
 
+    DPRINTF("setAttn: Set Attenuator to "); DPRINTLN(bandmem[curr_band].attenuator);
     // DPRINTF("Set Attenuator Relay to "); DPRINT(bandmem[curr_band].attenuator_byp); DPRINTF(" Attn_dB is "); DPRINTLN(bandmem[curr_band].attenuator_dB);
     // DPRINTF(" and Ref Level is "); DPRINTLN(Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor);
 }
@@ -614,78 +711,90 @@ COLD void Attn(int8_t delta)
 {
     int8_t _attn = bandmem[curr_band].attenuator_dB;
 
-    _attn += delta * 3;
+    _attn += delta * 10;
 
-    if (_attn > 100) // Keep in 0-100 range
-        _attn = 100;
-    if (_attn <= 0)
-        _attn = 0;
-    bandmem[curr_band].attenuator_dB = _attn; // Assign new valid value
-
-    // DPRINT("Setting attenuator value to "); DPRINTLN(bandmem[curr_band].attenuator_dB);
-
-    displayAttn(); // update the button value
-
-    // CALL HARDWARE SPECIFIC ATENUATOR or FIXED ATTN HERE
-    // This is for the PE4302 only.
-    digital_step_attenuator_PE4302(_attn); // Takes a 0 to 100 input, converts to the appropriate hardware steps such as 0-31dB in 1 dB steps
+    if (_attn > 10) // Keep in 0-100 range 10 for IC-905 on bands < 2400
+    {
+        bandmem[curr_band].attenuator_dB = _attn = 10;
+        setAttn(1);
+    }
+    if (_attn <= 0 || curr_band > BAND1296)  // skip for high bands and force off
+    {
+        bandmem[curr_band].attenuator_dB = _attn = 0;    
+        setAttn(0);
+    }
+    
+    DPRINT("Setting attenuator value to "); DPRINTLN(bandmem[curr_band].attenuator_dB);
+   
+    //displayAttn(); // update the button value
 }
 
-// PREAMP button
-//   toggle = 0 sets Preamp state off
-//   toggle = 1 sets Preamp state on
-//   toggle = 2 toggles Preamp state
-//   toggle = -1 or any value other than 0-2 sets Preamp state to current database value. Used for startup or changing bands.
+// ------------------------PREAMP button  - valid on bands < 2400 for IC-905 -----------------------
+//   0 sets Preamp state off
+//   1 sets Preamp state on
+//   2 toggles Preamp state
+//   -1 or any value other than 0-2 sets Preamp state to current database value. Used for startup or changing bands.
+//   3 use value from dB but do not send to radio (was likely read from radio) 
 //
 COLD void Preamp(int8_t toggle)
 {
     CIVresult_t CIVresultL;
     
+    DPRINTF("Preamp: toggle = "); DPRINTLN(toggle);
+    DPRINTF("Preamp: Preamp start state = "); DPRINTLN(bandmem[curr_band].preamp);
+
     if (toggle == 2) // toggle state
     {
         if (bandmem[curr_band].preamp == PREAMP_ON)
-            bandmem[curr_band].preamp = PREAMP_OFF;
+           toggle = 0;
         else
-            bandmem[curr_band].preamp = PREAMP_ON;
+            toggle = 1;
     }
-    else if (toggle == 1) // set to ON
+    
+    if (toggle == 1) // set to ON
+    {
         bandmem[curr_band].preamp = PREAMP_ON;
-    else if (toggle == 0) // set to OFF
+    }
+
+    if (toggle == 0 || curr_band > BAND1296) // set to OFF
+    {
         bandmem[curr_band].preamp = PREAMP_OFF;
+    }   
         // any other value of toggle pass through with unchanged state, jsut set the relays to current state
+    
+    if (bandmem[curr_band].attenuator == ATTN_ON && bandmem[curr_band].preamp ==PREAMP_ON)
+        bandmem[curr_band].attenuator = ATTN_OFF;   // turn off if attn is on
 
-#ifdef SV1AFN_BPF
-    // if (bandmem[curr_band].preamp == PREAMP_OFF)
-    //   Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor -= 30;  // reset back to normal
-    // else
-    //   Sp_Parms_Def[user_settings[user_Profile].sp_preset].spect_floor += 30;  // lower floor due to increased signal levels coming in
+    DPRINTF("Preamp 2: toggle = "); DPRINTLN(toggle);
+    DPRINTF("Preamp 2: Preamp start state = "); DPRINTLN(bandmem[curr_band].preamp);
+    DPRINTF("Preamp:2: ATTN state = "); DPRINTLN(bandmem[curr_band].attenuator);
 
-    //RampVolume(0.0f, 0);   //     0 ="No Ramp (instant)"  // loud pop due to instant change || 1="Normal Ramp" // graceful transition between volume levels || 2= "Linear Ramp"
-    codec1.muteHeadphone();
-    delay(50);
-    uint8_t rfg_temp = user_settings[user_Profile].rfGain;
-    RFgain(-1);
-    bpf.setPreamp((bool)bandmem[curr_band].preamp);
-    delay(50);
-    RFgain(rfg_temp);
-    //RampVolume(0.01f, 0);   // Instant off.  0 to 1.0f for full scale.
-    codec1.unmuteHeadphone(); // Audio out to Line-Out and TX board
-    AFgain(0); //   Reset afGain to last used to bypass thumps
-#endif
-
-    if (bandmem[curr_band].preamp) 
+    // Reading from the radio we just want to update database and screen and not repeat back to radio.
+    if (curr_band < BAND2400)
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_ON].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("PreAmp_to_Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        if (toggle < 3 )
+        {
+            if (bandmem[curr_band].preamp) 
+            {
+                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_ON].cmdData), CIV_D_NIX, CIV_wChk);
+                DPRINTF("Preamp: Send to Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+            }
+            else
+            {
+                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+                DPRINTF("Preamp: Send to Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+            }
+        }
     }
-    else
+    else  // preamp and atten not available on IC905 on bands above 1296
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_OFF].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("PreAmp_to_Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        DPRINTF("Preamp: Skipping for bands > 1296 - curr band is "); DPRINTLN(bandmem[curr_band].band_name);
     }
 
+    displayAttn();
     displayPreamp();
-    // DPRINTF("Set Preamp to "); DPRINTLN(bandmem[curr_band].preamp);
+    
+    DPRINTF("Preamp: Set Preamp to "); DPRINTLN(bandmem[curr_band].preamp);
 }
 
 // RIT button
@@ -1671,19 +1780,15 @@ COLD void selectAgc(uint8_t andx)
 {
     //struct AGC* pAGC = &agc_set[andx];
 
-    if (andx >= AGC_SET_NUM)
-        andx = AGC_OFF; // Cycle around
+    if (andx >= AGC_FAST)
+        andx = AGC_SLOW; // Cycle around
 
-    if (andx < AGC_OFF)
-        andx = AGC_SET_NUM - 1; // Cycle around
+    if (andx <= AGC_SLOW)
+        andx = AGC_FAST; // Cycle around
 
     bandmem[curr_band].agc_mode = andx;
 
-    if (andx == AGC_OFF)
-    {    }
-    else
-    {    }
-    // displayAgc();
+    displayAgc();
 }
 
 // Turns meter off
@@ -1841,30 +1946,30 @@ COLD void digital_step_attenuator_PE4302(int16_t _attn)
 
 //
 // Changes to the correct band settings for the new target frequency.
-// If the new frequency is below or above the band limits it returns a value of 0
+// If the new frequency is below or above the band limits it returns 0 else returns the new frequency
 //
-//#define DBG
+//#define DBG_BAND
 HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
 {
     int i;
 
-    #ifdef DBG
+    #ifdef DBG_BAND
         DPRINTF("find_band(): New Frequency requested = "); DPRINTLN(new_frequency);
         DPRINTF("find_band(): New Band requested = "); DPRINTLN(_curr_band);
     #endif
 
     for (i=BANDS-1; i>=0; i--)    // start at the top and look for first band that VFOA fits under bandmem[i].edge_upper
     {
-        #ifdef DBG
+        #ifdef DBG_BAND
             DPRINTF("find_band(): Edge_Lower Search = "); DPRINTLN(bandmem[i].edge_lower);
         #endif
         if (new_frequency >= bandmem[i].edge_lower && new_frequency <= bandmem[i].edge_upper) // found a band lower than new_frequency so search has ended
         {
-            #ifdef DBG
+            #ifdef DBG_BAND
                 DPRINTF("find_band(): Edge_Lower = "); DPRINTLN(bandmem[i].edge_lower);
             #endif
             _curr_band = bandmem[i].band_num;
-            #ifdef DBG
+            #ifdef DBG_BAND
                 DPRINTF("find_band(): New Band = "); DPRINTLN(_curr_band);
             #endif
             //  Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
@@ -1881,7 +1986,7 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
             }
         }
     }
-    //#ifdef DBG
+    //#ifdef DBG_BAND
        // DPRINTLNF("MAIN: Invalid Frequency Requested");
     //#endif
     return 0; // 0 means frequency was not found in the table
@@ -1892,9 +1997,9 @@ COLD uint8_t get_Mode_from_Radio(void)
 {
     CIVresult_t CIVresultL_mode;
 
-    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26_READ].cmdData), CIV_D_NIX, CIV_wChk);
-    delay(10);
+    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26A].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
+    Check_radio();
     return CIVresultL_mode.retVal;
 }
 
@@ -1918,7 +2023,7 @@ COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current acti
 //  Used when changing bands from the remote side.  
 COLD void send_Mode_to_Radio(uint8_t mndx) 
 {
-    CIVresult_t CIVresultL_vfo;
+    CIVresult_t CIVresultL;
     uint8_t data_str[6] = {};
 
     //DPRINT("send_Mode_to_Radio: mode index: "); DPRINTLN(mndx);  	
@@ -1938,15 +2043,18 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     radio_filter = bandmem[curr_band].filter_A = modeList[mndx].Width;
     
     //    bandmem[curr_band].data_A = 1;  // set DATA on or off 
-    
-    memcpy(data_str, &cmd_List[CIV_C_MOD_SET].cmdData, cmd_List[CIV_C_MOD_SET].cmdData[0]);  // copy a template then sub in the mode.
-    data_str[3] = radio_mode;  // send the mode values
-    data_str[4] = radio_data;  // set DATA on or off 
-    data_str[5] = radio_filter;  // Set filter
+
+    // Populate the datafield
+    data_str[0] = 3;  // send the mode values
+    data_str[1] = radio_mode;  // send the mode values
+    data_str[2] = radio_data;  // set DATA on or off 
+    data_str[3] = radio_filter;  // Set filter
     
     DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("    Data: "); DPRINTLN(radio_data);    
 
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_F26A].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
+    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MOD_READ].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
+    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
     //while (CIVresultL_vfo.retVal > CIV_OK_DAV)
     //{
     //    delay(40);
@@ -1954,23 +2062,22 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     //    DPRINTF("send_Mode_to_Radio: delay loop ret = "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);  
     //}
     
-    DPRINTF("send_Mode_to_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
+    //DPRINTF("send_Mode_to_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL.retVal]);
     
-    
-    if (CIVresultL_vfo.retVal == CIV_OK)
+    if (CIVresultL.retVal == CIV_OK)
     {
         DPRINT("send_Mode_to_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
         bandmem[curr_band].mode_A = mndx; // get current mode table index
+        Check_radio();
         displayMode();
         displayFilter();
         displayDATA();
     }
-    delay(20);
     return;
 }
 
 //  Used to read the Band stack register of choice
-//could be useful to read mode, filter, and other settings for each band on controller startup
+//  Could be useful to read mode, filter, and other settings for each band on controller startup
 COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radio for band and register contents
 {
     CIVresult_t CIVresultL_vfo;
@@ -1982,21 +2089,29 @@ COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radi
     data_str[1] = band;  // send the mode values
     data_str[2] = reg;  // send the mode values
 
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_BSTACK].cmdData), data_str, CIV_wChk);
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_BSTACK].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
     //DPRINTF("read_BSTACK_from_Radio: retVal of BSTACK writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
-    
+    delay(20);
+    Check_radio();
     if (CIVresultL_vfo.retVal == CIV_OK)
     {
         //DPRINT("read_BSTACK_from_Radio: Value is "); DPRINTLN(CIVresultL_vfo.value);  	
-        //bandmem[curr_band].mode_A = mndx; // get current mode table index
-        //displayMode();
         return 0;
     }
-
-    delay(60);
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
-
     return 1;
+}
+
+// Used to request frequency from radio
+COLD uint64_t get_Freq_from_Radio(void)   // Change Mode of the current active VFO by increment delta.
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
+    DPRINTF("get_Freq_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //return CIVresultL.value;  // return 
+    delay(20);
+    Check_radio();
+    return 1;  // return 1 for freq success, 0 for nothing, or any other value we are not looking for
 }
 
 // Used to request RX TX status from radio
@@ -2006,6 +2121,7 @@ COLD uint8_t get_RXTX_from_Radio(void)   // Change Mode of the current active VF
 
     CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_TX].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
+    Check_radio();
     return CIVresultL.value;
 }
 
@@ -2016,11 +2132,13 @@ COLD uint8_t get_MY_POSITION_from_Radio(void)
 
     CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_UTC_OFFSET].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of UTC Offset: "); DPRINTLN(retValStr[CIVresultL.value]);
-    delay(2);
-
+    delay(60);
+    check_CIV(millis());  // give time to respond -  Msg_type 3 is bstack results
+    
     CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MY_POSIT_READ].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of MY POS: "); DPRINTLN(retValStr[CIVresultL.value]);
-    delay(2);
+    delay(60);
+    check_CIV(millis());  // give time to respond -  Msg_type 3 is bstack results
 
     return CIVresultL.value;
 }
@@ -2030,9 +2148,19 @@ COLD uint8_t get_Preamp_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
-    return CIVresultL.value;
+    if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        delay(20);
+        Check_radio();
+        return CIVresultL.value;
+    }
+    else
+    {
+        DPRINTLNF("get_Preamp_from_Radio: skipping for bands > 1296");
+    }
+    return 0;
 }
 
 // Used to request status from radio
@@ -2040,8 +2168,42 @@ COLD uint8_t get_Attn_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_Atten_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
+    {
+        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
+        DPRINTF("get_Attn_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        delay(20);
+        Check_radio();
+        return CIVresultL.value;
+    }
+    else
+    {
+        DPRINTLNF("get_Attn_from_Radio: skipping for bands > 1296");
+    }
+    return 0;
+}
+
+// Used to request status from radio
+COLD uint8_t get_AGC_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_AGC_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
     return CIVresultL.value;
 }
 
+// Used to request status from radio - certain bands allow only AGC FAST, that is taken care by the calling function
+COLD uint8_t send_AGC_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    cmd_List[CIV_C_AGC_FAST].cmdData[3] = bandmem[curr_band].agc_mode;
+    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_FAST].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("send_AGC_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}

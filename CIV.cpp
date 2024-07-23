@@ -24,6 +24,7 @@ extern struct Band_Memory bandmem[];
 extern struct Modes_List modeList[];
 extern struct Filter_Settings filter[];
 extern struct User_Settings user_settings[];
+extern struct AGC agc_set[];
 extern unsigned int hexToDec(String hexString);
 
 uint64_t freq = 0;
@@ -32,13 +33,13 @@ struct cmdList cmd_List[End_of_Cmd_List] = {
     {CIV_C_F_SEND,          {1,0x00}},                      // send operating frequency to all
     {CIV_C_F1_SEND,         {1,0x05}},                      // send operating frequency to one
     {CIV_C_F_READ,          {1,0x03}},                      // read operating frequency
-    {CIV_C_F26_READ,        {2,0x26,0x00}},                 // read selected VFO m data, filt
-	{CIV_C_F26A_READ,       {1,0x26}},                 // read selected VFO m data, filt
-    {CIV_C_F26_SEND,        {5,0x26}},                 // send selected vfo mode, data, filter
+	{CIV_C_F26,        		{1,0x26}},                 // read selected VFO m data, filt
+    {CIV_C_F26A,        	{2,0x26,0x00}},                 // read selected VFO m data, filt
+	{CIV_C_F26B,       		{2,0x26,0x01}},                 // read un- selected VFO m data, filt
     {CIV_C_F25A_SEND,       {8,0x25,0x00}},                 // set selected VFO frequency
     {CIV_C_F25B_SEND,       {8,0x25,0x01}},                 // set un-selected VFO frequency
     {CIV_C_MOD_READ,        {1,0x04}},               	    // read Modulation Mode in use
-    {CIV_C_MOD_SET,         {5,0x26}},  // cmd 26; selected VFO; mode, data on/off(0-1), filter (1-3);
+    {CIV_C_MOD_SET,         {3,0x00,0x00,0x00}},  		    // cmd 26 datafield template; selected VFO; mode, data on/off(0-1), filter (1-3);
     {CIV_C_MOD_SEND ,       {1,0x01}},                      // send Modulation Mode to all
     {CIV_C_MOD1_SEND,       {1,0x06}},                      // send Modulation Mode to one
     {CIV_C_MOD_USB_F1_SEND, {3,0x06,0x01,0x01}},            // send USB Filter 1 
@@ -62,14 +63,17 @@ struct cmdList cmd_List[End_of_Cmd_List] = {
    	{CIV_C_PREAMP_READ,     {2,0x16,0x02}},             	// read preamp state
     {CIV_C_PREAMP_OFF,      {3,0x16,0x02,0x00}},            // send/read preamp 3rd byte is on or of for sending - 00 = OFF, 01 = ON
 	{CIV_C_PREAMP_ON,       {3,0x16,0x02,0x01}},            // send/read preamp 3rd byte is on or of for sending - 00 = OFF, 01 = ON
-    {CIV_C_AGC,             {2,0x16,0x12}},                 // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
-    {CIV_C_CW_MSGS,         {1,0x17}},                      // Send CW messages see page 17 of prog manual for char table
+    {CIV_C_AGC_READ,        {2,0x16,0x12}},                 // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
+	{CIV_C_AGC_FAST,        {3,0x16,0x12,0x01}},            // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
+    {CIV_C_AGC_MID,         {3,0x16,0x12,0x02}},            // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
+	{CIV_C_AGC_SLOW,        {3,0x16,0x12,0x03}},            // send/read AGC  01 = FAST, 02 = MID, 03 = SLOW
+	{CIV_C_CW_MSGS,         {1,0x17}},                      // Send CW messages see page 17 of prog manual for char table
     {CIV_C_BSTACK,          {2,0x1A,0x01}},                 // send/read BandStack contents - see page 19 of prog manual.  
                                                                     // data byte 1 0xyy = Freq band code
                                                                     // dat abyte 2 0xzz = register code 01, 02 or 03
                                                                     // to read 432 band stack register 1 use 0x1A,0x01,0x02,0x01
     {CIV_C_MY_POSIT_READ,   {2,0x23,0x00}},          	    // read my GPS Position
-	{CIV_C_MY_POSIT_DATA,   {1,0x23}},          	    // read my GPS Position
+	{CIV_C_MY_POSIT_DATA,   {1,0x23}},          	    	// read my GPS Position
     {CIV_C_RF_POW,          {2,0x14,0x0A}},            		// send / read max RF power setting (0..255 == 0 .. 100%)
     {CIV_C_TRX_ON_OFF,      {1,0x18}},                 		// switch radio ON/OFF
     {CIV_C_TRX_ID,          {2,0x19,0x00}},            		// ID query
@@ -125,7 +129,8 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
   	msg_type = 0;
   	CIVresultL = civ.readMsg(CIV_ADDR_905);
 
-  	//reqReceived = false;
+  	freqReceived = false;
+
   	if (CIVresultL.retVal <= CIV_NOK) // valid answer received !
 	{  
 
@@ -136,14 +141,12 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 			
 			for (cmd_num = CIV_C_F_SEND; cmd_num < End_of_Cmd_List; cmd_num++)  // loop through the command list structure looking for a pattern match
 			{				
-				//if ((!memcmp(CIVresultL.cmd, cmd_List[cmd_num].cmdData, CIVresultL.cmd[0])) && (CIVresultL.cmd[0] == cmd_List[cmd_num].cmdData[0]))		
 				for (int i = 0; i <= CIVresultL.cmd[0]; i++)  // start at the highest and search down. Break out if no match. Make it to the bottom and you have a match
 				{
 					//PC_Debug_port.printf("check_civ: cmd_num=%d from radio length=%d and cmd=%X, on remote length=%d and cmd=%X\n",cmd_num, CIVresultL.cmd[0], CIVresultL.cmd[1], cmd_List[cmd_num].cmdData[0], cmd_List[cmd_num].cmdData[1]);
 					if(cmd_List[cmd_num].cmdData[i] != CIVresultL.cmd[i]) 
 					{
-						//DPRINTLN("check_CIV: Skip this one");
-						//DPRINTF("check_CIV: Matched 1 element: look at next field, if any left. CMD Body Length = "); DPRINT(CIVresultL.cmd[0],HEX); DPRINTF(" CMD  = "); DPRINTLN(CIVresultL.cmd[1],HEX);
+						//DPRINTF("check_CIV: Skip this one - Matched 1 element: look at next field, if any left. CMD Body Length = "); DPRINT(CIVresultL.cmd[0],HEX); DPRINTF(" CMD  = "); DPRINTLN(CIVresultL.cmd[1],HEX);
 						match = 0;
 						break;
 					}
@@ -160,19 +163,23 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 			if (cmd_num >= End_of_Cmd_List-1)
 			{
 				cmd_num--;
-				PC_Debug_port.printf("Loop Completed -- cmd_num=%d from radio length=%d and cmd=%X, on remote length=%d and cmd=%X\n",cmd_num, CIVresultL.cmd[0], CIVresultL.cmd[1], cmd_List[cmd_num].cmdData[0], cmd_List[cmd_num].cmdData[1]);
-				DPRINTF("check_CIV: No match found: "); DPRINTLN(cmd_num);
+				PC_Debug_port.printf("Loop Completed, NO match found -- cmd_num=%d from radio length=%d and cmd=%X, on remote length=%d and cmd=%X\n",cmd_num, CIVresultL.cmd[0], CIVresultL.cmd[1], cmd_List[cmd_num].cmdData[0], cmd_List[cmd_num].cmdData[1]);
+				//DPRINTF("check_CIV: No match found: for "); DPRINTLN(cmd_num);
 				return 0;
 			}
 			else
 			{
-				DPRINTF("check_CIV: Match Cmd Num: "); DPRINTLN(cmd_num);
+				DPRINTF("check_CIV: Match Cmd list index: "); DPRINT(cmd_num);  DPRINTF("  CMD: "); DPRINTLN(CIVresultL.cmd[1],HEX);   
 			}		
 			// Check for Frequency message type
+			// NOTE:  when ther radio side changes bands the first message is a mode change followed by the frequency. 
+			// An attempt to get the 0x26 extended mode while the frequency is being sent results in a reliabl BUS conflict and mode and freq both fail.
+			// Hold off the 0x26 request until bandchange function asks for it.  Can test VFOA old and requested.
 			switch (cmd_num) 
 			{
 				case CIV_C_F_READ:
 				case CIV_C_F_SEND:
+				case CIV_C_F1_SEND:
 				{  // command CIV_C_F_SEND received
 					DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
 					VFOA = (uint64_t)CIVresultL.value;
@@ -186,7 +193,6 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				{  // command CIV_C_MODE_READ received
 					radio_mode = hexToDec(CIVresultL.value/100);
 					radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
-					//get_Mode_from_Radio(); 
 					DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Filter: "); DPRINTLN(filter[radio_filter].Filter_name);    
 					msg_type = 2;
 					freqReceived = false;
@@ -267,9 +273,10 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					break;
 				}
 
-				case CIV_C_F26_READ:
-				case CIV_C_F26A_READ:
-				case CIV_C_F26_SEND:
+				case CIV_C_F26A:
+				case CIV_C_F26B:
+				case CIV_C_F26:
+				//case CIV_C_F26_SEND:
 				{
 					// [0]=x is length, [1]== 0 is selected VFO
 					radio_mode   = CIVresultL.datafield[2];  // mode
@@ -292,7 +299,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				case CIV_C_TX:	
 				{
 					uint8_t RX = CIVresultL.value;
-					//get_Mode_from_Radio();
+					get_RXTX_from_Radio();
 					DPRINTF("check_CIV: CI-V Returned RX-TX status: "); DPRINTLN(RX);
 					if (RX == 1)
 						user_settings[user_Profile].xmit = 1;
@@ -305,11 +312,11 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 
 				// Test for MY_POSITION response
 				// Be sure to give long response time before another command or this long answer will be cut short
-				case CIV_C_MY_POSIT_READ:
+				//case CIV_C_MY_POSIT_READ:
 				case CIV_C_MY_POSIT_DATA:
 				{
 					//uint8_t RX = CIVresultL.value;
-					//get_Mode_from_Radio();s
+
 					//DPRINTF("check_CIV: CI-V Returned MY POSITION and TIME: "); DPRINTLN(retValStr[CIVresultL.value]);
 					//               pos      1             2  3  4  5  6    7  8  9 10 11 12   13 14 15 16   17 18   19 20 21   22 23  24  25  26 27 28 term
 					// FE.FE.E0.AC.  23.00.  datalen byte  47.46.92.50.01.  01.22.01.98.70.00.  00.15.59.00.  01.05.  00.00.07.  20.24. 07. 20. 23.32.45. FD
@@ -368,22 +375,27 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				}  // UTC Offset
 
 				case CIV_C_PREAMP_READ:	
-				case CIV_C_PREAMP_ON:
-    			case CIV_C_PREAMP_OFF:
+				//case CIV_C_PREAMP_ON:
+    			//case CIV_C_PREAMP_OFF:
 				{
 					uint8_t _val = CIVresultL.value;
-					//get from_Radio();
+					
 					DPRINTF("check_CIV: CI-V Returned PreAmp status: "); DPRINTLN(_val);
-					if (_val == 1)
+
+					if (_val > 0)
 					{
-						setAttn(0); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-						Preamp(1);
+						// Reading from the radio we just want to update database and screen and not repeat back to radio.
+						bandmem[curr_band].attenuator = ATTN_OFF;   // Only 1 on at a time
+						bandmem[curr_band].preamp = PREAMP_ON;
 					}
 					if (_val == 0)
-						Preamp(0);
+					{
+						bandmem[curr_band].preamp = PREAMP_OFF;
+					}
 					msg_type = 8;
 					freqReceived = false;
 					displayPreamp();
+					displayAttn();
 					break;
 				}  // Preamp changed
 
@@ -392,29 +404,51 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
     			case CIV_C_ATTN_OFF:
 				{
 					uint8_t _val = CIVresultL.value;
-					//get from_Radio();
-					DPRINTF("check_CIV: CI-V Returned PreAmp status: "); DPRINTLN(_val);
-					if (_val == 1)
+
+					DPRINTF("check_CIV: CI-V Returned Attn status: "); DPRINTLN(_val);
+					if (_val > 0)
 					{
-						Preamp(0);
-						setAttn(1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+						bandmem[curr_band].preamp 		= PREAMP_OFF;
+						bandmem[curr_band].attenuator  	= ATTN_ON;
 					}
 					if (_val == 0)
-						setAttn(0); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+					{
+						bandmem[curr_band].attenuator   = ATTN_OFF;
+					}
+					
 					msg_type = 9;
 					freqReceived = false;
 					displayAttn();
+					displayPreamp();
 					break;
 				}  // Attn changed
+				
+				case CIV_C_AGC_READ:
+				//case CIV_C_AGC_FAST:
+				//case CIV_C_AGC_MID:
+				//case CIV_C_AGC_SLOW:
+				{
+					uint8_t _val = CIVresultL.value;
 
+					if (_val == 1) {bandmem[curr_band].agc_mode = AGC_FAST; AGC(3);} // 0 sets to database state. 2 is toggle state. -1 and 1 are down and up
+					if (_val == 2) {bandmem[curr_band].agc_mode = AGC_MID;  AGC(3);} // 0 sets to database state. 2 is toggle state. -1 and 1 are down and up
+					if (_val == 3) {bandmem[curr_band].agc_mode = AGC_SLOW; AGC(3);} // 0 sets to database state. 2 is toggle state. -1 and 1 are down and up
+					DPRINTF("check_CIV: CI-V Returned AGC state: "); DPRINTLN(agc_set[bandmem[curr_band].agc_mode].agc_name);
+					msg_type = 10;
+					freqReceived = false;
+					displayAgc();
+					break;
+				}  // AGC changed
 			}  // end switch
 			return msg_type;
     	}  // Data available
 
 		// ----------------------------------  do a query for frequency, if necessary
 		// poll every 500 * 10ms = 5sec until a valid frequency has been received
-		if ((freqReceived == false) && (CAT_Freq_Check.check() == 1)) 
+		//if ((freqReceived == false) && (CAT_Freq_Check.check() == 1)) 
+		if (0)  // not sure we need this, possibly corrupting other sequences
 		{
+			delay(20);
 			CIVresultL = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);
 			if (CIVresultL.retVal<=CIV_NOK)
 			{
@@ -448,11 +482,11 @@ void pass_CAT_msgs_to_RADIO(void)
 // If you want to see the hex message contest turn on logging in the library file.  This will display the log.
 void show_CIV_log(void) 
 {
-  if (CAT_Poll.check() == 1)
+  //if (CAT_Poll.check() == 1)
     civ.logDisplay();  // show messages accumulated until cleared.
 
   // can clear the log periodically here based on timer
-  if (CAT_Log_Clear.check() == 1)  // Clear the CIV log buffer, jsu show last 2 seconds
+  //if (CAT_Log_Clear.check() == 1)  // Clear the CIV log buffer, jsu show last 2 seconds
     civ.logClear();
 }
 

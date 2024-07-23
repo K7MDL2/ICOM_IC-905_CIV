@@ -266,9 +266,9 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define XVTR14      13
 #define XVTR15      14
 #define AGC_OFF     0       // Index to AGC Settings table
-#define AGC_SLOW    1
-#define AGC_MED     2
-#define AGC_FAST    3
+#define AGC_SLOW    3
+#define AGC_MID     2
+#define AGC_FAST    1
 #define MIC_OFF     0
 #define MIC_ON      1
 #define BW0_25      0
