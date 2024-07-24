@@ -11,6 +11,11 @@ It can run as a minimal headless package on a Teensy 4.0 for the purpose of a ba
 The leveraged Teensy SDR project is at https://github.com/K7MDL2/KEITHSDR
 The RF Wattmeter and Band decoder project is at https://github.com/K7MDL2/RF-Power-Meter-V1
 
+Here is a compact 4.3" SDR chassis with touch screen and 2 encoders that can double as a Remote controller and band decoder box.  A 7" is seen down the page.
+
+![Compact SDR chassis](https://github.com/K7MDL2/ICOM_IC-905_CIV/blob/main/Pictures/Compact%204.3inch%20Teensy%20SDR%20chassis.png)
+
+
 Why would some combo of knobs, buttons or touchscreen be useful you ask?
 
 Due to the limited front panel size and few buttons, several features require navigating multiple menu levels or at least 2-3 button pushes. Some examples of what a custom conmtrol head can do:
