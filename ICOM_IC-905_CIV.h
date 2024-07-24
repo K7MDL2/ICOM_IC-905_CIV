@@ -455,7 +455,9 @@ struct Band_Memory {
     uint8_t     bandmap_en;     // Enable in Bandmap.  Skip band if 0, include if !0.
     uint8_t     xvtr_num;       // index to Transverter Table.
     uint8_t     xvtr_IF;        // index to actual radio RF frequency to be used  (ex: BAND10M )
-    uint16_t    xvPwrSet;       // last used power level
+    uint8_t     xvtr_Dirty;     // =1 when this IF band was used. When changing to a new non-xvtr band, 
+                                //    search for an IF band that matches the target band.  If "dirty" send down stored values to reset the normal band.
+    uint16_t    xvtr_PwrSet;    // last used xvtr power level  
     int16_t     DialCal;        // Calibration offset correction to apply to main frequency (VFOA) - most useful for unlocked LO transverters
     uint16_t    bandDecode;     // Output pattern for band decoder per-band. 
 };
