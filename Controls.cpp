@@ -219,7 +219,42 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
         setRIT(0); // turn off if it was off before on this new band
 */
     selectFrequency(0);
-    
+
+    // If the current band is configured as a Transverter IF Band then we need to store the direct band's values in a safe place and
+    // push down the transverter band values for all settings that matter. 
+    // On leaving the transverter band we need to reset the direct band values on next use.  
+    // This makes an argument for controlling all bands for the remote.  
+    // Maybe update the database on startup by scanning all bands, or on a band's first use.
+
+    // For transverter IF band support  
+    // We already have the direct band (now to be the IF band) values stored in our bandmem table.  
+    // Send down the Xvtr band values to overwrite. 
+    // When changing to the direct band in the future, we need to push down the stored values instead of reading them normal
+    // Cannot depend on reading them before band changes since the radio side may initiate it without warning.
+    // Each time changebands() runs, look through the bandmem table IFBand field to see if the target band was used used as a Xvtr IF band.
+    // If it was, send stored values.  If the band was changed to a non-xvtr band, then changed back to this band, and never was used as a Xvtr IF band,
+    // then nothing should change and nothing is hurt by sending down what we already know.
+    // An optimization is to mark a direct band as "dirty" each time it was used as an IF band and if that is dialed up in the future, then "reset" the radio side values.
+
+    if (bandmem[curr_band].xvtr_IF)  // this is an Xvtr IF band
+    {
+        bandmem[curr_band].xvtr_Dirty = 1;  // mark this IF band dirty so the orignal "direct" band will get restored next time it is active (not as an IF band)
+        DPRINTLNF("changeBands: Set IF band to Dirty for future restoral. Send down stored value to radio for this Xvtr IF band");
+        send_Mode_to_Radio(bandmem[curr_band].mode_A);
+        Preamp(-1);
+        AGC(2);
+        setAttn(-1);
+    }
+    else if (bandmem[curr_band].xvtr_Dirty = 1)  //  this is a non-Xvtr band and check to see if was dirty for use as a IF band earlier
+    {
+        DPRINTLNF("changeBands: thnis non-=Xvtr band is marked as a Dirty from IF band usage. Send down stored values to radio for this former Xvtr IF band");
+        send_Mode_to_Radio(bandmem[curr_band].mode_A);
+        Preamp(-1);
+        AGC(2);
+        setAttn(-1);
+        bandmem[curr_band].xvtr_Dirty = 0;  // set band status to clean now that we have restored the original values best we can
+    }
+ 
     // converts the current band number to a pattern which is then applied to a group of GPIO pins.
     // You can edit the patern for each band in RadioConfig.h
     Band_Decode_Output(curr_band);
@@ -229,7 +264,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
 
     DPRINTLNF("changeBands: Set other related band settings");
     // Split(0);
-    
+
     //selectBandwidth(bandmem[curr_band].filter);
     delay(200);
     Check_radio();  //Radio will send back a freq if initialed by the remote side so collect it here
@@ -623,7 +658,7 @@ COLD void VFO_AB(void)
 //    0 sets attenuator state off
 //    1 sets attenuator state on
 //    2 toggles attenuator state
-//    3 set attenuator state to current database value but does nto send to radio (likely came from radio)
+//    3 set attenuator state to current database value but does not send to radio (likely came from radio)
 //
 COLD void setAttn(int8_t toggle)
 {
