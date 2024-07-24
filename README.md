@@ -127,9 +127,9 @@ and so on to 122G band.
 
 The GPIO pins are also defined in RadioConfig.h Look for a section that looks like this:
 
-#define BAND_DECODE_OUTPUT_PIN_0    GPIO_SW4_PIN     // bit 0
-#define BAND_DECODE_OUTPUT_PIN_1    GPIO_SW5_PIN     // bit 1
-#define BAND_DECODE_OUTPUT_PIN_2    GPIO_SW6_PIN     // bit 2
+    #define BAND_DECODE_OUTPUT_PIN_0    GPIO_SW4_PIN     // bit 0
+    #define BAND_DECODE_OUTPUT_PIN_1    GPIO_SW5_PIN     // bit 1
+    #define BAND_DECODE_OUTPUT_PIN_2    GPIO_SW6_PIN     // bit 2
 
 The IO pins number themselves are assigned in the motherboard definitions also in RadioConfig.h - Here is a small bit of it:
 
@@ -141,7 +141,7 @@ The IO pins number themselves are assigned in the motherboard definitions also i
 In my shack I can wire this directly to my existing opto-coupler shack band decoder and program that do do about anything with over 20 opto-coupler outputs.
 For simpler tripod microwave outings with the IC-905 I can package a headless T4.0 in a snmall case and add a suitable interface transistors to drive antenna relays and switch PTT to the right amp.
 
- Tested the Band enable setting in RadioConfig.h to set 6M on. In SDR_Data.h I changed the IF band from NONE to BAND1296 which teh software treats as a transverter band and tune the radio on 1296 but display and reports at 50MMhz. 6M shows in the Band Select and appears properly when cycling up and down bands. VFO is stored separately from the direct 1296 band. So this seems to do exactly as desired.  In the SDR_Data.h bandmem table, besides the xvtr_IF value (BAND1296 here) there is also a dialcal value where you can set any small corrections due to repeatable transverter crystal inaccuracy.  There is a power setting also which is not implemented yet.  Some handy items to finish volume, RF Gain, and RF power for each band.  The last field in each row is a band decode output pattern. The RadioConfig.h pattern described above is written into that field thus stored on SD card also. 
+ Tested the Band enable setting in RadioConfig.h to set 6M on. In SDR_Data.h I changed the IF band from NONE to BAND1296 which the software treats as a transverter band and tune the radio on 1296 but display and reports at 50MMhz. 6M shows in the Band Select and appears properly when cycling up and down bands. VFO is stored separately from the direct 1296 band. So this seems to do exactly as desired.  In the SDR_Data.h bandmem table, besides the xvtr_IF value (BAND1296 here) there is also a dialcal value where you can set any small corrections due to repeatable transverter crystal inaccuracy.  There is a power setting also which is not implemented yet.  Some handy items to finish volume, RF Gain, and RF power for each band.  The last field in each row is a band decode output pattern. The RadioConfig.h pattern described above is written into that field thus stored on SD card also. 
                                                                               
     { "10M",    28000000,    29600000,    28074000, USB, FILT1, DATA_OFF,     28200000, USB, FILT1, DATA_OFF,     29400000,  USB, FILT2, DATA_OFF,     28200000, USB, BW4_0, 4000,  BAND10M,  1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1, 9,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  OFF,  NONE,    NONE,    100,   -0,  0xFFFF},
     {  "6M",    50000000,    54000000,    50125000, USB, FILT1, DATA_OFF,     50313000, USB, FILT1, DATA_OFF,     50100000,  CW,  FILT2, DATA_OFF,     50313000, USB, BW3_2, 3200,  BAND6M,   1, AGC_SLOW,OFF,OFF,OFF,OFF,ANT1,10,  ATTN_OFF,  0,    0,  PREAMP_ON,   5,  OFF,  XVTR1,   BAND1296, 30,   -0,  0x0001},
