@@ -50,7 +50,7 @@ extern int16_t	rit_offset;  // global rit value in Hz
 extern int16_t	rit_offset_last;  // global rit value in Hz
 extern int16_t 	xit_offset;  // global rit value in Hz
 extern int16_t	xit_offset_last;  // global rit value in Hz
-extern uint64_t xvtr_offset;  // global LO offset for transverters
+extern int64_t xvtr_offset;  // global LO offset for transverters
 extern int64_t  Fc;
 extern void setActiveWindow(int16_t XL,int16_t XR ,int16_t YT ,int16_t YB);
 extern void setActiveWindow_default(void);

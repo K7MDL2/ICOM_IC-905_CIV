@@ -19,7 +19,7 @@ extern uint8_t user_Profile;
 extern const struct TuneSteps tstep[];
 extern int16_t rit_offset;  // global rit value in Hz
 extern int16_t xit_offset;  // global xit value in Hz
-extern uint64_t xvtr_offset;  // Adds 'LO" to displayed frequency for transverters.
+extern int64_t xvtr_offset;  // Adds 'LO" to displayed frequency for transverters.
 extern int64_t Fc;
 
 #ifdef SV1AFN_BPF

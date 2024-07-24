@@ -56,7 +56,7 @@ extern int16_t fft_bins;
 #endif
 //extern float pan;
 float pan;
-extern uint64_t xvtr_offset; // LO to apply to actual PLL freq
+extern int64_t xvtr_offset; // LO to apply to actual PLL freq
 extern int16_t rit_offset;        // global RIT offset value in Hz.
 extern int16_t xit_offset;        // global XIT offset value in Hz.
 extern int16_t rit_offset_last;   // global RIT offset value in Hz.
@@ -201,13 +201,17 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
             DPRINTF("changeBands: after find new band, Last used VFOA is "); DPRINTLN(VFOA);
         }
     }
-    DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  New VFOA is "); DPRINTLN(VFOA);
+    
+    DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); 
+    DPRINTF("  New VFOA is "); DPRINT(VFOA); 
+    DPRINTF("  xvtr_IF is "); DPRINTLN(bandmem[curr_band].xvtr_IF);
     
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
     if (bandmem[curr_band].xvtr_IF)
         xvtr_offset = bandmem[curr_band].edge_lower - bandmem[bandmem[curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
     else
         xvtr_offset = 0;
+    
     DPRINTF("changeBands: xvtr_offset is "); DPRINTLN(xvtr_offset);
 
     DPRINTLNF("changeBands: Set RIT if On");
@@ -226,79 +230,51 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     // This makes an argument for controlling all bands for the remote.  
     // Maybe update the database on startup by scanning all bands, or on a band's first use.
 
-    // For transverter IF band support  
-    // We already have the direct band (now to be the IF band) values stored in our bandmem table.  
-    // Send down the Xvtr band values to overwrite. 
-    // When changing to the direct band in the future, we need to push down the stored values instead of reading them normal
-    // Cannot depend on reading them before band changes since the radio side may initiate it without warning.
-    // Each time changebands() runs, look through the bandmem table IFBand field to see if the target band was used used as a Xvtr IF band.
-    // If it was, send stored values.  If the band was changed to a non-xvtr band, then changed back to this band, and never was used as a Xvtr IF band,
-    // then nothing should change and nothing is hurt by sending down what we already know.
-    // An optimization is to mark a direct band as "dirty" each time it was used as an IF band and if that is dialed up in the future, then "reset" the radio side values.
-
-    if (bandmem[curr_band].xvtr_IF)  // this is an Xvtr IF band
-    {
-        bandmem[curr_band].xvtr_Dirty = 1;  // mark this IF band dirty so the orignal "direct" band will get restored next time it is active (not as an IF band)
-        DPRINTLNF("changeBands: Set IF band to Dirty for future restoral. Send down stored value to radio for this Xvtr IF band");
-        send_Mode_to_Radio(bandmem[curr_band].mode_A);
-        Preamp(-1);
-        AGC(2);
-        setAttn(-1);
-    }
-    else if (bandmem[curr_band].xvtr_Dirty = 1)  //  this is a non-Xvtr band and check to see if was dirty for use as a IF band earlier
-    {
-        DPRINTLNF("changeBands: thnis non-=Xvtr band is marked as a Dirty from IF band usage. Send down stored values to radio for this former Xvtr IF band");
-        send_Mode_to_Radio(bandmem[curr_band].mode_A);
-        Preamp(-1);
-        AGC(2);
-        setAttn(-1);
-        bandmem[curr_band].xvtr_Dirty = 0;  // set band status to clean now that we have restored the original values best we can
-    }
- 
-    // converts the current band number to a pattern which is then applied to a group of GPIO pins.
-    // You can edit the patern for each band in RadioConfig.h
-    Band_Decode_Output(curr_band);
-
-    // Example how and when to output new Band Decoder pattern on output IO pins. Pins assignments TBD.
-    // Set the new band decoder output pattern for this band change
-
     DPRINTLNF("changeBands: Set other related band settings");
     // Split(0);
 
-    //selectBandwidth(bandmem[curr_band].filter);
-    delay(200);
-    Check_radio();  //Radio will send back a freq if initialed by the remote side so collect it here
-    delay(20);
-    get_Preamp_from_Radio(); // sync up with radio
-    //Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-    //Check_radio();
-    get_Attn_from_Radio();  //sync up with radio
-    //Check_radio();
-    //setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
-    get_AGC_from_Radio();
-    //Check_radio();
-    //selectAgc(bandmem[curr_band].agc_mode);
-    get_Mode_from_Radio();
-    //Check_radio();
-    //send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
+    // The get_XXX functions were used when the radio was the master source.  
+    // It can be sometimes problematic when the radio seems to not want to remember the mode when changing banmds.  Works for a while then stops.
+    // With tehe need to use a radio band for both direct and transvters uses, we need to control what settings are for each usage
+    // Making the remote the master source is the easy answer to all issues so far.
 
+    //get_Preamp_from_Radio(); // sync up with radio
+    Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    Check_radio();  // do a check to make sure we service our rx buffer before it overflows.  Normally called in main loop but we are not there yet.
+    
+    //get_Attn_from_Radio();  //sync up with radio
+    Check_radio();
+    setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    
+    //get_AGC_from_Radio();
+    AGC(2);
+    Check_radio();
+
+    //get_Mode_from_Radio();
+    send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
+    Check_radio();
+    
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
     AFgain(0);
     NBLevel(0); // 0 just updates things to be current value
-    ATU(-1);    // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.
     
-    //delay(10);
+    // converts the current band number to a pattern which is then applied to a group of GPIO pins.
+    // You can edit the patern for each band in RadioConfig.h
+    Band_Decode_Output(curr_band);
+    
     // Rate(0); Not needed
     // Ant() when there is hardware to setup in the future
+
     // ATU() when there is hardware to setup in the future
+    ATU(-1);    // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.
     //
     //    insert any future features, software or hardware, that need to be altered
     //
     user_settings[user_Profile].last_band = curr_band;
     user_settings[user_Profile].sub_VFO = VFOB;
     
-    //write_db_tables();  // Save to SD card
+    write_db_tables();  // Save to SD card
     displayRefresh();
 
     DPRINTLNF("changeBands: Complete\n");
@@ -369,7 +345,6 @@ COLD void setMode(int8_t dir)
         send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
     displayMode();
-    //selectFrequency(0); // Call in case a mode change requires a frequency offset
     get_AGC_from_Radio();  // let the radio update to the per mode AGC setting it has
     get_Attn_from_Radio(); // radio wont tell us it changed so have to ask
     get_Preamp_from_Radio(); // radio wont tell us it changed so have to ask
@@ -662,8 +637,8 @@ COLD void VFO_AB(void)
 //
 COLD void setAttn(int8_t toggle)
 {
-    DPRINTF("setAttn: toggle = "); DPRINTLN(toggle);
-    DPRINTF("setAttn: Attn start state = "); DPRINTLN(bandmem[curr_band].attenuator);
+    //DPRINTF("setAttn: toggle = "); DPRINTLN(toggle);
+    //DPRINTF("setAttn: Attn start state = "); DPRINTLN(bandmem[curr_band].attenuator);
 
     CIVresult_t CIVresultL;
 
@@ -689,12 +664,6 @@ COLD void setAttn(int8_t toggle)
 
     if (bandmem[curr_band].preamp == PREAMP_ON && bandmem[curr_band].attenuator == ATTN_ON)   // turn off if the preamp is on
         bandmem[curr_band].preamp = PREAMP_OFF;
-
-
-    DPRINTF("setAttn 2: toggle = "); DPRINTLN(toggle);
-    DPRINTF("setAttn 2: ATTN start state = "); DPRINTLN(bandmem[curr_band].attenuator);
-    DPRINTF("setAttn:2: Preamp state = "); DPRINTLN(bandmem[curr_band].preamp);
-
 
     // Reading from the radio we just want to update database and screen and not repeat back to radio.
     // 0 = no change to set attenuator level to value in database for this band
@@ -778,8 +747,8 @@ COLD void Preamp(int8_t toggle)
 {
     CIVresult_t CIVresultL;
     
-    DPRINTF("Preamp: toggle = "); DPRINTLN(toggle);
-    DPRINTF("Preamp: Preamp start state = "); DPRINTLN(bandmem[curr_band].preamp);
+    //DPRINTF("Preamp: toggle = "); DPRINTLN(toggle);
+    //DPRINTF("Preamp: Preamp start state = "); DPRINTLN(bandmem[curr_band].preamp);
 
     if (toggle == 2) // toggle state
     {
@@ -802,10 +771,6 @@ COLD void Preamp(int8_t toggle)
     
     if (bandmem[curr_band].attenuator == ATTN_ON && bandmem[curr_band].preamp ==PREAMP_ON)
         bandmem[curr_band].attenuator = ATTN_OFF;   // turn off if attn is on
-
-    DPRINTF("Preamp 2: toggle = "); DPRINTLN(toggle);
-    DPRINTF("Preamp 2: Preamp start state = "); DPRINTLN(bandmem[curr_band].preamp);
-    DPRINTF("Preamp:2: ATTN state = "); DPRINTLN(bandmem[curr_band].attenuator);
 
     // Reading from the radio we just want to update database and screen and not repeat back to radio.
     if (curr_band < BAND2400)
@@ -2064,22 +2029,29 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     CIVresult_t CIVresultL;
     uint8_t data_str[6] = {};
 
-    //DPRINT("send_Mode_to_Radio: mode index: "); DPRINTLN(mndx);  	
-
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
         DPRINTF("send_Mode_to_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
         mndx = MODES_NUM -3;    // go to start of list
     }
     
+    DPRINTF("send_Mode_to_Radio: Mode_A index = "); DPRINT(bandmem[curr_band].mode_A);
+    DPRINTF(" curr_band = "); DPRINTLN(bandmem[curr_band].band_name);
+
     if (modeList[mndx].data == 1)  // selected xxx-D modes needs DATA enabled on radio or not
         radio_data = bandmem[curr_band].data_A = 1;  // set DATA on or off 
     else 
         radio_data = bandmem[curr_band].data_A = 0;  // set DATA on or off 
 
-    radio_mode = modeList[mndx].mode_num;
+    DPRINTF("send_Mode_to_Radio: BCD mode_num = "); DPRINT(modeList[mndx].mode_num, HEX);
+    DPRINTF("  filter width = "); DPRINTLN(modeList[mndx].Width);
+
+    radio_mode = modeList[mndx].mode_num;  // now in BCD form
     radio_filter = bandmem[curr_band].filter_A = modeList[mndx].Width;
     
+    DPRINTF("send_Mode_to_Radio: radio_mode = "); DPRINT(radio_mode, HEX);
+    DPRINTF(" radio_filter = "); DPRINTLN(radio_filter);
+
     //    bandmem[curr_band].data_A = 1;  // set DATA on or off 
 
     // Populate the datafield

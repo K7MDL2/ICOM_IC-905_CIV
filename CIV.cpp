@@ -190,10 +190,25 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 
 				case CIV_C_MOD_READ: // Test for MODE change
 				case CIV_C_MOD_SEND:
-				{  // command CIV_C_MODE_READ received
-					radio_mode = hexToDec(CIVresultL.value/100);
+				{  
+					// command CIV_C_MODE_READ received
+					radio_mode = CIVresultL.value/100;
+					DPRINTF("check_CIV: Mode in BCD: "); DPRINT(radio_mode);
+					
+					// look up the bcd value in our modelist table to see what radio mode it is 
+					for (uint8_t i = 0; i< MODES_NUM; i++)
+					{
+						if (modeList[i].mode_num == hexToDec(radio_mode))  // match bcd value to table mode_num value to get out mode index that we store
+						{	
+							radio_mode = i;  // now know our index
+							break;  
+						}
+					}// radio_mode now converted to a table index
+					
 					radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
+					
 					DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Filter: "); DPRINTLN(filter[radio_filter].Filter_name);    
+					
 					msg_type = 2;
 					freqReceived = false;
 					break;
@@ -233,11 +248,22 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					}
 					DPRINTF("  Frequency: "); DPRINT(bstack_freq);
 					
-					radio_mode = CIVresultL.datafield[DstopIdx];  // modulation mode
+					radio_mode = CIVresultL.datafield[DstopIdx];  // modulation mode in BCD
 					radio_filter = CIVresultL.datafield[DstopIdx+1];  // filter 
 					radio_data = CIVresultL.datafield[DstopIdx+2];  // data mode on or off
-					DPRINTF("  Mode: "); DPRINT(radio_mode, HEX); DPRINT("  Filter: ");DPRINT(radio_filter, HEX);  DPRINT("  Data: ");DPRINTLN(radio_data, HEX);   
-
+					DPRINTF("  Mode: "); DPRINT(radio_mode, HEX); DPRINT("  Filter: ");DPRINT(radio_filter, HEX);  DPRINT("  Data: ");DPRINT(radio_data, HEX);   
+								
+					// convert to our own mode extended mode list to show -D (or not)
+					for (uint8_t i = 0; i< MODES_NUM; i++)
+					{
+						if (modeList[i].mode_num == radio_mode && modeList[i].data == radio_data)
+						{
+							radio_mode = i;   
+							break;
+						}
+					}
+					DPRINTF("  Mode Index: "); DPRINT(radio_mode); DPRINTF("  Mode label: "); DPRINTLN(modeList[radio_mode].mode_label); 
+					
 					// convert radio bstack band code to remote bandmem table band index
 					switch (bstack_band)
 					{
@@ -249,23 +275,24 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 						case 6: band = BAND10G; break;
 						default: band = BAND144; break;
 					}
-
+// ToDo: convert the radio mode to our extended most list which is a combo of mode and data
+// This lookup is probably done elsewhere so put it here too.
 					switch (bstack_reg)
 					{
-						case 1: bandmem[band].vfo_A_last   = bstack_freq; 
-								bandmem[band].mode_A = radio_mode;
-								bandmem[band].filter_A = radio_filter;
-								bandmem[band].data_A = radio_data; 		// LSB, USB, AM, FM modes can have DATa mode on or off.  All other radio modes data is NA.
+						case 1: bandmem[band].vfo_A_last   	= bstack_freq; 
+								bandmem[band].mode_A 		= radio_mode; // now an index to our extended mode list
+								bandmem[band].filter_A 		= radio_filter;
+								bandmem[band].data_A 		= radio_data; 		// LSB, USB, AM, FM modes can have DATa mode on or off.  All other radio modes data is NA.
 								break;
-						case 2: bandmem[band].vfo_A_last_1 = bstack_freq; 
-								bandmem[band].mode_A_1 = radio_mode; 
-								bandmem[band].filter_A_1 = radio_filter;
-								bandmem[band].data_A_2 = radio_data;
+						case 2: bandmem[band].vfo_A_last_1 	= bstack_freq; 
+								bandmem[band].mode_A_1 		= radio_mode;
+								bandmem[band].filter_A_1 	= radio_filter;
+								bandmem[band].data_A_2 		= radio_data;
 								break;
-						case 3: bandmem[band].vfo_A_last_2 = bstack_freq; 
-								bandmem[band].mode_A_2 = radio_mode;
-								bandmem[band].filter_A_2 = radio_filter; 
-								bandmem[band].data_A_2 = radio_data;
+						case 3: bandmem[band].vfo_A_last_2 	= bstack_freq; 
+								bandmem[band].mode_A_2 		= radio_mode;
+								bandmem[band].filter_A_2	= radio_filter; 
+								bandmem[band].data_A_2 		= radio_data;
 								break;
 					}
 					msg_type = 3;
@@ -279,15 +306,20 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				//case CIV_C_F26_SEND:
 				{
 					// [0]=x is length, [1]== 0 is selected VFO
-					radio_mode   = CIVresultL.datafield[2];  // mode
+					radio_mode   = CIVresultL.datafield[2];  // mode is in HEX!
 					radio_data   = bandmem[curr_band].data_A   = CIVresultL.datafield[3];  // data on/off
 					radio_filter = bandmem[curr_band].filter_A = CIVresultL.datafield[4];  // filter setting
 
+  					// convert to our own mode list to show -D (or not)
 					for (uint8_t i = 0; i< MODES_NUM; i++)
 					{
 						if (modeList[i].mode_num == radio_mode && modeList[i].data == radio_data)
-							radio_mode = bandmem[curr_band].mode_A = i;   // convert to our own mode list to show -D (or not)
+						{
+							radio_mode = bandmem[curr_band].mode_A = i;  // now stored as our index to the combo in modelist table
+							break;
+						}
 					}
+					
 					modeList[radio_mode].Width = radio_filter;  // store filter in mode table using the extended mode value (-D or no -D)
 					DPRINTF("check_CIV: CI-V Returned Extended Mode: "); DPRINT(modeList[radio_mode].mode_label); DPRINT("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINT("  Data: "); DPRINTLN(radio_data);  
 					msg_type = 4;

@@ -189,7 +189,7 @@ Metro CAT_Poll             = Metro(5000);  // Throttle the servicing for CAT com
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
 
-uint64_t    xvtr_offset             = 0;
+int64_t     xvtr_offset             = 0;
 int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
 int16_t     xit_offset              = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
 int16_t     rit_offset_last         = 0;    // track last used value when turning the RIT on and off. 
@@ -245,10 +245,20 @@ void setup()
         set_I2CEncoders();   // Serasch through encoder_list table and identify active i2c encoder roles and slot assignments.
     #endif // I2C_ENCODERS
 
+    if (PTT_INPUT != 255)
+        pinMode(PTT_INPUT, INPUT_PULLUP); // Init PTT in and out lines
+    if (PTT_OUT1 != 255)
+    {
+        pinMode(PTT_OUT1, OUTPUT);
+        digitalWrite(PTT_OUT1, HIGH);
+    }
+
     #ifdef GPIO_ENCODERS
         if (GPIO_ENC2_ENABLE) pinMode(GPIO_ENC2_PIN_SW, INPUT_PULLUP);   // Pullups for GPIO Enc2 and 3 switches
         if (GPIO_ENC3_ENABLE) pinMode(GPIO_ENC3_PIN_SW, INPUT_PULLUP);
     #endif
+
+    // These may be overwritten laer for band decoder outputs.  It is OK to set them here anyway.
     if (GPIO_SW1_ENABLE)  pinMode(GPIO_SW1_PIN,  INPUT_PULLUP);
     if (GPIO_SW2_ENABLE)  pinMode(GPIO_SW2_PIN,  INPUT_PULLUP);
     if (GPIO_SW3_ENABLE)  pinMode(GPIO_SW3_PIN,  INPUT_PULLUP);
@@ -259,7 +269,7 @@ void setup()
     // Use for ANT switch
     if (GPIO_ANT_ENABLE) pinMode(GPIO_ANT_PIN, OUTPUT); // Took over SW6 default input pin to make this an output (by config)
 
-    // Set up band decoder output pins
+    // Set up band decoder output pins using pins configured in RadioConfig.h
     Decoder_GPIO_Pin_Setup();
 
     // Serach for a default_MF_client tag and save it in a global var
@@ -382,8 +392,6 @@ void setup()
     counter = 0;
     //disp_Menu();
 
-    PC_Debug_port.println("End of Setup");
-
      // -------- Read SD Card data----------------------------------------------------------
     // To use the audio card SD card Reader instead of the Teensy 4.1 onboard Card Reader
     // UNCOMMENT THESE TWO LINES FOR TEENSY AUDIO BOARD   ***IF*** they are not used for something else:
@@ -417,21 +425,27 @@ void setup()
     get_MY_POSITION_from_Radio();
     delay(100);
 
-    // override our defaults with the radio's Bandstack values for each band (3 values per band)
+    // Consider overriding our defaults with the radio's Bandstack values for each band (3 values per band)
     // transverter bands will use the bandmem table defaults until the radio sends something in use.
     for (int i = 1; i <= 6; i++)
     {
         for (int j = 1; j <= 3; j++)
         {
             read_BSTACK_from_Radio(i, j);
-            //if (read_BSTACK_from_Radio(i, j) == 0)  // read band stack reg 1 for 144Mhz to get the mode, filter freq
-            //    while (check_CIV(millis()) != 3)  // give time to respond -  Msg_type 3 is bstack results
-            //delay(20);
         }
     }
-    delay(100);
 
+    #ifdef USE_RA8875
+        tft.clearScreen();
+    #else
+        tft.clearActiveScreen(); 
+    #endif
+
+   // -------- Setup our radio settings and UI layout --------------------------------
     //==================================== Frequency Set ==========================================
+    
+    curr_band = user_settings[user_Profile].last_band; // get last band used from user profile.
+
     #ifdef PANADAPTER
         VFOA = PANADAPTER_LO;
         VFOB = PANADAPTER_LO;
@@ -439,46 +453,36 @@ void setup()
         VFOA = bandmem[curr_band].vfo_A_last;
         VFOB = user_settings[user_Profile].sub_VFO;
     #endif
+
+     DPRINT("Setup: curr_band = "); DPRINTLN(curr_band);
     
     get_Freq_from_Radio();   // get freq from radio, comment this out if you want the remote database stored to rule
-    delay(400);
-    DPRINT("Setup: VFOA = "); DPRINTLN(VFOA);
     
-    // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
-    find_new_band(VFOA, curr_band);  // find band index for VFOA frequency
-    if (bandmem[curr_band].xvtr_IF)
-        xvtr_offset = bandmem[curr_band].edge_lower - bandmem[bandmem[curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
-    else
-        xvtr_offset = 0;
-    DPRINTF("Setup: xvr_offset = "); DPRINTLN(xvtr_offset);
+    delay(400);
+    
+    DPRINT("Setup: VFOA = "); DPRINTLN(VFOA);
 
     #if defined USE_CAT_SER
         //CAT_Serial.setup_CAT_Serial();   
         //delay(1000); // Give time to see the slash screen
     #endif
 
-    #ifdef USE_RA8875
-        tft.clearScreen();
-    #else
-        tft.clearActiveScreen();
-    #endif
-
-    DPRINTF("\nInitial Dial Frequency is "); DPRINT(formatVFO(VFOA)); DPRINTLNF("MHz");
-
-    //initVfo(); // initialize the si5351 vfo
-    
+    // let changebands() take in VFO and figure out correct curr_band for allowed bands
     changeBands(0); // Sets the VFOs to last used frequencies, sets preselector, active VFO, other last-used settings per band.
                     // Call changeBands() here after volume to get proper startup volume
     
+    DPRINTF("\nInitial Dial Frequency is "); DPRINT(formatVFO(VFOA)); DPRINTLNF("MHz");
+
     InternalTemperature.begin(TEMPERATURE_NO_ADC_SETTING_CHANGES);
  
     draw_2_state_Button(SMETER_BTN, &std_btn[SMETER_BTN].show); // clear out text artifacts
     update_icon_outline(); // update any icons related to active encoders functions  This also calls displayRefresh.
-    // displayRefresh();
+    displayRefresh();
+
+     PC_Debug_port.println("End of Setup");
 }
 
 //-------------------------- End Setup -------------------------------------
-
 
 void loop()
 {  
@@ -1389,7 +1393,8 @@ uint8_t Check_radio(void)
         DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
         setMode(3);
         // sending ext mode request to radio if during a radio side bandchange this reqeast will fail.  Let changeBands do it sicne it follows a band change.
-        //get_Mode_from_Radio();  // get extened data for DATa on/off state
+        set_Mode_from_Radio(radio_mode);  // use the info we have.  Missing DATA ON/Off state inb this basic message so next step is to get extended info.
+        get_Mode_from_Radio();  // get extended data for DATA on/off state
     }
     else if (ret_val == 4)
     {
