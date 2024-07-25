@@ -130,7 +130,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
   	CIVresultL = civ.readMsg(CIV_ADDR_905);
 
   	freqReceived = false;
-
+	
   	if (CIVresultL.retVal <= CIV_NOK) // valid answer received !
 	{  
 

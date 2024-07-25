@@ -1438,8 +1438,10 @@ COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
     {
         user_settings[user_Profile].xmit = OFF;
         if (PTT_OUT1 != 255)
-            digitalWrite(PTT_OUT1, HIGH);
-
+        {
+            digitalWrite(PTT_OUT1, HIGH);  // remove GND
+            civ.SetDTR(LOW);  // raise DTR
+        }
         // enable line input to pass to headphone jack on audio card, set audio levels
         //TX_RX_Switch(OFF, mode_idx, OFF, OFF, OFF, OFF, 0.5f);
         // int TX,                 // TX == 1, RX == 0
@@ -1454,7 +1456,10 @@ COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
     {
         user_settings[user_Profile].xmit = ON;
         if (PTT_OUT1 != 255)
-            digitalWrite(PTT_OUT1, LOW);
+            {
+                digitalWrite(PTT_OUT1, LOW);  // Pull to GND
+                civ.SetDTR(HIGH);  // raise DTR
+            }
 
         //TX_Timeout.reset(); // Reset our Runaway TX timer.  Main loop will watch for this to trip calling back here to flip back to RX.
 

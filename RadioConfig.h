@@ -244,7 +244,6 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 #define ENABLE_15M_BAND   0
 #define ENABLE_12M_BAND   0
 #define ENABLE_10M_BAND   0
-
 // These are transverter bands common to all RF hardware that covers HF bands to 30MHz.
 // The default IF is 10M band defined in the bandmem table in SDR_DATA.h
 #define ENABLE_6M_BAND    1  // if you hardware does 6M then edit the bandmem table in SDR_DATA.h
