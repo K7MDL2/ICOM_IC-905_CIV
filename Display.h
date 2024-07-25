@@ -18,7 +18,7 @@ void drawLabel(uint8_t lbl_num, uint8_t *function_ptr);
 void displayRefresh();
 // Bottom Panel Anchor button
 void displayFn();   // make fn=1 to call displayFn() to prevent calling itself
-void displayFreq();    // display frequency
+void displayFreq(void);    // display frequency
 // Panel 1 buttons
 void displayMode();
 void displayFilter();

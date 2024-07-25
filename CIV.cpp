@@ -169,7 +169,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 			}
 			else
 			{
-				DPRINTF("check_CIV: Match Cmd list index: "); DPRINT(cmd_num);  DPRINTF("  CMD: "); DPRINTLN(CIVresultL.cmd[1],HEX);   
+				//DPRINTF("check_CIV: Match Cmd list index: "); DPRINT(cmd_num);  DPRINTF("  CMD: "); DPRINTLN(CIVresultL.cmd[1],HEX);   
 			}		
 			// Check for Frequency message type
 			// NOTE:  when ther radio side changes bands the first message is a mode change followed by the frequency. 
@@ -330,14 +330,21 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				// Test for  TX-RX change
 				case CIV_C_TX:	
 				{
-					uint8_t RX = CIVresultL.value;
-					get_RXTX_from_Radio();
-					DPRINTF("check_CIV: CI-V Returned RX-TX status: "); DPRINTLN(RX);
-					if (RX == 1)
-						user_settings[user_Profile].xmit = 1;
-					if (RX == 0)
-						user_settings[user_Profile].xmit = 0;
-					msg_type = 5;
+					uint8_t TX;
+					static uint8_t TX_last = 0;
+
+					//get_RXTX_from_Radio(); asks the radio every 500ms or so from main loop.  Look for answer back here
+					TX = CIVresultL.value;
+					if (TX != TX_last)  // stte has changed
+					{
+						//DPRINTF("check_CIV: CI-V Returned RX-TX status changed: "); DPRINTLN(TX);
+						if (TX == 1) // in TX
+							user_settings[user_Profile].xmit = 1;
+						if (TX == 0) // in RX
+							user_settings[user_Profile].xmit = 0;
+						TX_last = TX; // capure state to detect change
+						msg_type = 5;
+					}  // if no state change then will return default msg_type which is 0 and the main loop wll skip out.
 					freqReceived = false;
 					break;
 				}  // RX TX  changed	

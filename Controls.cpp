@@ -1470,7 +1470,7 @@ COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
         ///   TX_RX_Switch(ON, mode_idx, OFF, ON, OFF, OFF, OFF);  // Turn on USB input, Turn Mic OFF
         //else
         //    TX_RX_Switch(ON, mode_idx, ON, OFF, OFF, OFF, OFF); // Turn Mic input ON, Turn USB IN OFF
-        //DPRINTLN("XMIT(): TX ON");
+        DPRINTLN("XMIT(): TX ON");
     }
     displayXMIT();
     displayFreq();
@@ -2135,7 +2135,7 @@ COLD uint8_t get_RXTX_from_Radio(void)   // Change Mode of the current active VF
     CIVresult_t CIVresultL;
 
     CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_TX].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
     Check_radio();
     return CIVresultL.value;
 }

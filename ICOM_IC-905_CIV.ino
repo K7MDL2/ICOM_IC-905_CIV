@@ -139,6 +139,7 @@ HOT  bool GPIO_Sw_read(bool sw_pushed, uint8_t sw_pin, uint8_t slot);
 //COLD void digitalClockDisplay(void); 
 COLD void MF_Service(int8_t counts, int8_t knob);
 COLD void Change_FFT_Size(uint16_t new_size, float new_sample_rate_Hz);
+extern CIV     civ;
 
 #ifndef PANADAPTER
     #ifdef USE_ENET_PROFILE
@@ -188,6 +189,7 @@ Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT co
 Metro CAT_Poll             = Metro(5000);  // Throttle the servicing for CAT comms
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
+Metro CAT_RX_TX_Check      = Metro(300);   // Clear the CIV log buffer
 
 int64_t     xvtr_offset             = 0;
 int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
@@ -388,6 +390,8 @@ void setup()
     tft.print("Initializing USB Host port to Radio - Cable Connected?");
     
     civ_905_setup();   
+
+    civ.SetDTR(LOW);  // Drop DTR
     
     counter = 0;
     //disp_Menu();
@@ -566,9 +570,11 @@ void loop()
         newFreq = 0;
     }
 
-    if (CAT_Poll.check() == 1) show_CIV_log();
+    if (CAT_RX_TX_Check.check() == 1) get_RXTX_from_Radio(); // poll the TX/RX state of the radio
     
     Check_radio();
+
+    if (CAT_Poll.check() == 1) show_CIV_log();
 
     #if defined I2C_ENCODERS || defined MECH_ENCODERS
         Check_Encoders();
@@ -1401,7 +1407,7 @@ uint8_t Check_radio(void)
         set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
         DPRINTF("Check_radio: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
     }
-    else if (ret_val == 5)  // RX TX status received
+    else if (ret_val == 5)  // RX TX status has changed, display the state
     {
         DPRINTF("Check_radio: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
         displayXMIT();
