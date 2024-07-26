@@ -305,7 +305,7 @@ const uint16_t myVDARKGREEN = 0x12C3; // very dark green  spectrum function want
 #define NTCH2       2
 
 // This group defines the number of records in each structure
-#define MODES_NUM   15
+#define MODES_NUM   16
 #define FREQ_DISP_NUM  4
 #define BANDS       25
 #define XVTRS       15
@@ -653,7 +653,7 @@ ICradio_test - a_Defines.h
 
 // Global compile switches ===================================================================================
 
-#define VERSION_STRING "CIVbusLib ICradio_selRadioTest V0_8 22/05/04"
+//#define VERSION_STRING "CIVbusLib ICradio_selRadioTest V0_1 July 2024"
 
 // common switches -----------------------------------
 
