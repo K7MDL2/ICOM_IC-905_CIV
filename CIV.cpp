@@ -105,7 +105,7 @@ CIVresult_t CIVresultL;
 void civ_905_setup(void) {
   civ.setupp(true, false, "");     // initialize the civ object/module
                                    // and the ICradio objects
-  civ.registerAddr(CIV_ADDR_905);  // tell civ, that this is a valid address to be used
+  civ.registerAddr(CIV_ADDR_MODEL);  // tell civ, that this is a valid address to be used
 }
 
 //***************************************************************************
@@ -127,7 +127,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 	uint8_t match = 0;
 
   	msg_type = 0;
-  	CIVresultL = civ.readMsg(CIV_ADDR_905);
+  	CIVresultL = civ.readMsg(CIV_ADDR_MODEL);
 
   	freqReceived = false;
 	
@@ -282,16 +282,19 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 						case 1: bandmem[band].vfo_A_last   	= bstack_freq; 
 								bandmem[band].mode_A 		= radio_mode; // now an index to our extended mode list
 								bandmem[band].filter_A 		= radio_filter;
+								modeList[bandmem[band].mode_A].Width = radio_filter;
 								bandmem[band].data_A 		= radio_data; 		// LSB, USB, AM, FM modes can have DATa mode on or off.  All other radio modes data is NA.
 								break;
 						case 2: bandmem[band].vfo_A_last_1 	= bstack_freq; 
 								bandmem[band].mode_A_1 		= radio_mode;
 								bandmem[band].filter_A_1 	= radio_filter;
+								modeList[bandmem[band].mode_A].Width = radio_filter;
 								bandmem[band].data_A_2 		= radio_data;
 								break;
 						case 3: bandmem[band].vfo_A_last_2 	= bstack_freq; 
 								bandmem[band].mode_A_2 		= radio_mode;
 								bandmem[band].filter_A_2	= radio_filter; 
+								modeList[bandmem[band].mode_A].Width = radio_filter;
 								bandmem[band].data_A_2 		= radio_data;
 								break;
 					}
@@ -309,6 +312,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					radio_mode   = CIVresultL.datafield[2];  // mode is in HEX!
 					radio_data   = bandmem[curr_band].data_A   = CIVresultL.datafield[3];  // data on/off
 					radio_filter = bandmem[curr_band].filter_A = CIVresultL.datafield[4];  // filter setting
+					modeList[bandmem[curr_band].mode_A].Width = radio_filter;
 
   					// convert to our own mode list to show -D (or not)
 					for (uint8_t i = 0; i< MODES_NUM; i++)
@@ -488,7 +492,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 		if (0)  // not sure we need this, possibly corrupting other sequences
 		{
 			delay(20);
-			CIVresultL = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);
+			CIVresultL = civ.writeMsg(CIV_ADDR_MODEL, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);
 			if (CIVresultL.retVal<=CIV_NOK)
 			{
 				DPRINTF("check_CIV: Poll for RADIO Frequency Status: "); DPRINT(CIVresultL.retVal);
