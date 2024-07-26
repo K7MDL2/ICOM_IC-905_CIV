@@ -23,7 +23,7 @@ To compile sucessfully you must configure the Teensy 4.0 or 4.1 USB mode.
 
 For this build it must be set to SERIAL+MIDI+AUDIO.   
 
-The previous builds were Dual Serial. No changing this mode wil result in a complie time error about AudioInputUSB not found
+The previous builds were Dual Serial. Not changing this mode wil result in a complie time error about AudioInputUSB not found
 
 There is only 1 USB serial port active now so debug is globally shut off with '#define DEBUG' to allow the 
 OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
@@ -34,6 +34,13 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 #define BANNER "ICOM CIV USB Decoder"  // Custom Startup Screen Text
 #define CALLSIGN  "K7MDL CN87xs"   // Personalized Startup Screen Text
 
+#define CIV_ADDR CIV_ADDR_705     // The CIV address to use.  The list below is form teh CIVMasterLib.  You can enter a custom address or use a predefined name below.
+                                  // CIV_ADDR_7100   = 0x88; // (Default-)address of the IC7100
+                                  // CIV_ADDR_7300   = 0x94; // (Default-)address of the IC7300
+                                  // CIV_ADDR_9700   = 0xA2; // (Default-)address of the IC9700
+                                  // CIV_ADDR_705    = 0xA4; // (Default-)address of the IC705
+                                  // CIV_ADDR_905    = 0xAC; // (Default-)address of the IC905
+                                  
 #define USE_RA8875          // Turns on support for RA8875 LCD Touchscreen Display with FT5204 Touch controller
                             // When commented out it will default to the RA8876 controller and FT5206 touch controller
                             // DEPENDS on correct display controller type connected via 4-wire SPI bus.
@@ -481,18 +488,33 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 
 #endif // K7MDL_BUILD
 
-// BAND DECODE OUPUT PINS
+// BAND DECODE OUTPUT PINS
 // Assign your pins of choice.  Use a number or one of the existing #define number names
-// Make sure they are not mionitored by teh code as a button or other use like and encoder.
-#define BAND_DECODE_OUTPUT_PIN_0    GPIO_SW4_PIN     // bit 0
-#define BAND_DECODE_OUTPUT_PIN_1    GPIO_SW5_PIN     // bit 1
-#define BAND_DECODE_OUTPUT_PIN_2    GPIO_SW6_PIN     // bit 2
-#define BAND_DECODE_OUTPUT_PIN_3    GPIO_ENC3_PIN_A     // bit 3
-#define BAND_DECODE_OUTPUT_PIN_4    GPIO_ENC3_PIN_B     // bit 4
-#define BAND_DECODE_OUTPUT_PIN_5    GPIO_ENC3_PIN_SW     // bit 5
-#define BAND_DECODE_OUTPUT_PIN_6    GPIO_GPS_TX_PIN  // bit 6
-#define BAND_DECODE_OUTPUT_PIN_7    GPIO_GPS_RX_PIN  // bit 7
+// Make sure they are not monitored by the code as a button or other use like an encoder.
+// If not used set to GPIO_PIN_NOT_USED since there is no pin 255.
+#define GPIO_PIN_NOT_USED                255
 
+#define BAND_DECODE_OUTPUT_PIN_0        GPIO_SW4_PIN        // bit 0
+#define BAND_DECODE_OUTPUT_PIN_1        GPIO_SW5_PIN        // bit 1
+#define BAND_DECODE_OUTPUT_PIN_2        GPIO_SW6_PIN        // bit 2
+#define BAND_DECODE_OUTPUT_PIN_3        GPIO_ENC3_PIN_A     // bit 3
+#define BAND_DECODE_OUTPUT_PIN_4        GPIO_ENC3_PIN_B     // bit 4
+#define BAND_DECODE_OUTPUT_PIN_5        GPIO_ENC3_PIN_SW    // bit 5
+#define BAND_DECODE_OUTPUT_PIN_6        GPIO_PIN_NOT_USED   // bit 6
+#define BAND_DECODE_OUTPUT_PIN_7        GPIO_PIN_NOT_USED   // bit 7
+
+// BAND DECODE PTT OUTPUT PINS
+// Assign your pins of choice.  Use a number or one of the existing #define number names
+// Make sure they are not monitored by the code as a button or other use like an encoder.
+// If not used set to GPIO_PIN_NOT_USED since there is no pin 255.
+#define BAND_DECODE_PTT_OUTPUT_PIN_0    GPIO_SPARE1_PIN     // bit 0
+#define BAND_DECODE_PTT_OUTPUT_PIN_1    GPIO_SPARE2_PIN     // bit 1
+#define BAND_DECODE_PTT_OUTPUT_PIN_2    GPIO_SPARE3_PIN     // bit 2
+#define BAND_DECODE_PTT_OUTPUT_PIN_3    GPIO_GPS_RX_PIN     // bit 3
+#define BAND_DECODE_PTT_OUTPUT_PIN_4    GPIO_GPS_TX_PIN     // bit 4
+#define BAND_DECODE_PTT_OUTPUT_PIN_5    GPIO_PIN_NOT_USED   // bit 5
+#define BAND_DECODE_PTT_OUTPUT_PIN_6    GPIO_PIN_NOT_USED   // bit 6
+#define BAND_DECODE_PTT_OUTPUT_PIN_7    GPIO_PIN_NOT_USED   // bit 7
 
 // Band Decode Output patterns.
 // By default using BCD pattern following the Elecraft K3 HF-TRN table.  5 bits are used. Bit 4 =1 is VHF+ group
@@ -522,7 +544,38 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 #define DECODE_BAND76G      (0x1D)    //76.1G
 #define DECODE_BAND122G     (0x1E)    //122G
 #define DECODE_GENERAL      (0x1F)     // Non-Ham Band
-                                                                                                               
+
+// Band Decode Output patterns.
+// By default using BCD pattern following the Elecraft K3 HF-TRN table.  5 bits are used. Bit 4 =1 is VHF+ group
+#define DECODE_BAND160M_PTT     (0x01)   //160M_PTT 
+#define DECODE_BAND80M_PTT      (0x02)    //80M_PTT
+#define DECODE_BAND60M_PTT      (0x00)    //60M_PTT
+#define DECODE_BAND40M_PTT      (0x03)    //40M_PTT
+#define DECODE_BAND30M_PTT      (0x04)    //30M_PTT
+#define DECODE_BAND20M_PTT      (0x05)    //20M_PTT
+#define DECODE_BAND17M_PTT      (0x06)    //17M_PTT      
+#define DECODE_BAND15M_PTT      (0x07)    //15M_PTT
+#define DECODE_BAND12M_PTT      (0x08)    //12M_PTT
+#define DECODE_BAND10M_PTT      (0x09)    //10M_PTT
+#define DECODE_BAND6M_PTT       (0x0A)    //6M_PTT
+//#define DECODE_BAND70       (0x01)    //70M_PTTHz
+#define DECODE_BAND144_PTT      (0x12)    //2M_PTT
+#define DECODE_BAND222_PTT      (0x13)    //222_PTT
+#define DECODE_BAND432_PTT      (0x14)    //432_PTT
+#define DECODE_BAND902_PTT      (0x15)    //902_PTT
+#define DECODE_BAND1296_PTT     (0x16)    //1296_PTT
+#define DECODE_BAND2400_PTT     (0x17)    //2400_PTT
+#define DECODE_BAND3400_PTT     (0x18)    //3400_PTT
+#define DECODE_BAND5760_PTT     (0x19)    //5760_PTT
+#define DECODE_BAND10G_PTT      (0x1A)    //10.368.1G_PTT
+#define DECODE_BAND24G_PTT      (0x1B)    //24.192G_PTT
+#define DECODE_BAND47G_PTT      (0x1C)    //47.1G_PTT
+#define DECODE_BAND76G_PTT      (0x1D)    //76.1G_PTT
+#define DECODE_BAND122G_PTT     (0x1E)    //122G_PTT
+#define DECODE_GENERAL_PTT      (0x1F)     // Non-Ham Band
+
+
+
 #ifdef I2C_ENCODERS
   #if I2C_ENC1_ENABLE > 0
     #define I2C_ENC1_ADDR       (0x61)  	/* Address 0x61 only - Jumpers A0, A5 and A6 are soldered.*/
