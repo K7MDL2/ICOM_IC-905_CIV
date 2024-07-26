@@ -435,7 +435,7 @@ void setup()
     {
         for (int j = 1; j <= 3; j++)
         {
-            read_BSTACK_from_Radio(i, j);
+            //read_BSTACK_from_Radio(i, j);
         }
     }
 
@@ -1389,19 +1389,20 @@ uint8_t Check_radio(void)
         VFOA_temp = VFOA;
         curr_band_temp = curr_band;
     }
-    else if (ret_val == 2)  // When the radio initiates a band change it sends out basic mode msg followed by frequency
-    // Requesting an extended (0x26) mode immediately will clobber the frequency message from the radio
-    // the result is both the ext mde and freq are clobbered due to BUS_CONFLICT.
-    // Do the ext mode during band change and not here.  Hard part is knowing. 
+    else if (ret_val == 2)  // When the radio initiates a band change it sends out basic mode msg followed by frequency.  
+    // If we try to set the mode it will be for the old band.  So delay and wait for frequency, change band then deal with extended if needed.
+    // Requesting an extended (0x26) mode immediately aftere a basic mode is received, if this was a radio side band change, 
+    //     will clobber the frequency message from the radio.  Without the delay, the result is both the ext mode requeast and freq received are clobbered due to BUS_CONFLICT.
+    //
     // A timer may need to be set to wait is do the ext mode to give time to see if this is part of a radio side band change
     // If so can cancel the timer in band change and skip this one sicne it will be done there.
+    // For now trying a delay.  We need to know the extended if it was just a mode change on the same band.
     {
         DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
-        setMode(3);
-        // sending ext mode request to radio if during a radio side bandchange this reqeast will fail.  Let changeBands do it sicne it follows a band change.
-        set_Mode_from_Radio(radio_mode);  // use the info we have.  Missing DATA ON/Off state inb this basic message so next step is to get extended info.
-        delay(50);
-        get_Mode_from_Radio();  // get extended data for DATA on/off state
+        // Ignore this request and set mode in dB when we get the extended request which will after the frequency band changee
+        // delay sending extended mode request to radio if during a radio side band change this request will fail.
+        delay(30); // give time for frequency message to be received if this was leading off a radio side band change. A timer and flag would be better.
+        get_Mode_from_Radio();  // request extended data for DATA on/off state from radio
     }
     else if (ret_val == 4)
     {
