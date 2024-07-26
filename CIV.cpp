@@ -105,7 +105,7 @@ CIVresult_t CIVresultL;
 void civ_905_setup(void) {
   civ.setupp(true, false, "");     // initialize the civ object/module
                                    // and the ICradio objects
-  civ.registerAddr(CIV_ADDR_MODEL);  // tell civ, that this is a valid address to be used
+  civ.registerAddr(CIV_ADDR);  // tell civ, that this is a valid address to be used
 }
 
 //***************************************************************************
@@ -127,7 +127,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 	uint8_t match = 0;
 
   	msg_type = 0;
-  	CIVresultL = civ.readMsg(CIV_ADDR_MODEL);
+  	CIVresultL = civ.readMsg(CIV_ADDR);
 
   	freqReceived = false;
 	
@@ -492,7 +492,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 		if (0)  // not sure we need this, possibly corrupting other sequences
 		{
 			delay(20);
-			CIVresultL = civ.writeMsg(CIV_ADDR_MODEL, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);
+			CIVresultL = civ.writeMsg(CIV_ADDR, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);
 			if (CIVresultL.retVal<=CIV_NOK)
 			{
 				DPRINTF("check_CIV: Poll for RADIO Frequency Status: "); DPRINT(CIVresultL.retVal);
