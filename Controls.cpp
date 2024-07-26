@@ -361,7 +361,7 @@ COLD void setMode(int8_t dir)
 //  Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
 //          1 = step up 1 filter (wider)
 //         -1 = step down 1 filter (narrower)
-//          2 = use last filter width used in this mode (from modeList table)
+//          2 = use last filter width used in this mode from the dB (from modeList table)
 //          3 = set from dB but do not send to radio (read radio and set dB to match)
 //
 //  This is mode-aware. In non-CW modes we will only cycle through SSB width filters as set in the filter tables
@@ -372,7 +372,7 @@ COLD void Filter(int8_t dir)
     static int8_t direction = 1;
     int8_t _bw             = bandmem[curr_band].filter_A; // Change Bandwidth  - cycle down then back to the top
 
-    if (dir != 2)
+    if (dir < 2)
     {
         // 1. Limit to allowed step range
         // 2. Cycle up and at top, cycle back down, do not roll over.
@@ -398,7 +398,6 @@ COLD void Filter(int8_t dir)
 
         if (_bw < FILT1) // limit in case of encoder counts
             _bw = FILT1;
-
     }
     
     // DD mode only allow AGC Fast
@@ -1006,7 +1005,7 @@ COLD void Split(uint8_t state)
 //   state = 0 sets DATA state off
 //   state = 1 sets DATA state on
 //   state = 2 toggles DATA state
-COLD void DATA(uint8_t state)
+COLD void setDATA(uint8_t state)
 {
     if (state == 0)
         bandmem[curr_band].data_A = OFF;
