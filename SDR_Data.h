@@ -447,7 +447,7 @@ struct Modes_List modeList[MODES_NUM] = {
     {0x03, "CW    ", 3, 0},
     {0x04, "RTTY  ", 1, 0},
     {0x05, "FM    ", 1, 0},
-    //{0x06, "W-FM  ", 1},  // NA for IC-905
+    {0x06, "W-FM  ", 1, 0},  // NA for IC-905
     {0x07, "CW-R  ", 2, 0},
     {0x08, "RTTY-R", 1, 0},
     {0x17, "DV    ", 1, 0},  // hex 17 is 23 dec
