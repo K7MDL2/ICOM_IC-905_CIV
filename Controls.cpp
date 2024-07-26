@@ -150,14 +150,15 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     int8_t target_band;
     // TODO search bands column for match to account for mapping that does not start with 0 and bands could be in odd order and disabled.
 
-    DPRINTF("\nchangeBands: Previous Band was "); DPRINTLN(bandmem[curr_band].band_name); DPRINTF("  Current Freq is "); DPRINT(VFOA); DPRINTF("  Current Last_VFOA is "); DPRINTLN(bandmem[curr_band].vfo_A_last);
+    DPRINTF("\nchangeBands: Previous Band was "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  Current Freq: "); DPRINT(VFOA); 
+    DPRINTF("  Current Last_VFOA: "); DPRINT(bandmem[curr_band].vfo_A_last); DPRINTF("  Current Mode: "); DPRINTLN(bandmem[curr_band].mode_A);
 
     target_band = bandmem[curr_band].band_num + direction;
     // target_band = curr_band + direction;    
 
     Split(0);
 
-    DPRINTF("changeBands: Proposed Target Band is "); DPRINTLN(bandmem[target_band].band_name);
+    DPRINTF("changeBands: Proposed Target Band is "); DPRINT(bandmem[target_band].band_name);  DPRINTF(" Proposed Target Mode is "); DPRINTLN(bandmem[target_band].mode_A);
 
     uint16_t top_band    = BANDS-1;
     uint16_t bottom_band = 0;
@@ -202,10 +203,20 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
         }
     }
     
+    // When changing bands alweays use the db modse_A and Filter A values.  These are the last used values on that band.  
+    // The modeList table only remembers the last filter used for each mode and a new band may have diffent needs.  
+    // The modList table will attempt to set the filter appropriate for a new mode on the same band using the last time that mode was used
+    //   which could have been any band and a long time past.  But is the the best guess as some modes allows only FIL1 which using that woud cause all modes to be set to FIL 1.
+    // An option to so have a modeList table per band.
+
+    // In summary:  Set modeList filter on mode changes from radio or remote
+    //              On band changes use teh ModeA and filter_A, set teh modeList filter for the new band mode to Filter_A, it could have been different.
     DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); 
-    DPRINTF("  New VFOA is "); DPRINT(VFOA); 
-    DPRINTF("  xvtr_IF is "); DPRINT(bandmem[curr_band].xvtr_IF);
-    DPRINTF("  Mode will be "); DPRINTLN(bandmem[curr_band].mode_A);
+    DPRINTF("  New VFOA: "); DPRINT(VFOA); 
+    DPRINTF("  xvtr_IF: "); DPRINT(bandmem[curr_band].xvtr_IF);
+    DPRINTF("  Mode:  "); DPRINT(bandmem[curr_band].mode_A);
+    DPRINTF("  Filter: "); DPRINT(bandmem[curr_band].filter_A);
+    DPRINTF("  modeList Filter: "); DPRINTLN(modeList[bandmem[curr_band].mode_A].Width);
 
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
     if (bandmem[curr_band].xvtr_IF)
@@ -239,19 +250,22 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     // With tehe need to use a radio band for both direct and transvters uses, we need to control what settings are for each usage
     // Making the remote the master source is the easy answer to all issues so far.
 
+    setMode(3);
+
     //get_Preamp_from_Radio(); // sync up with radio
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
     Check_radio();  // do a check to make sure we service our rx buffer before it overflows.  Normally called in main loop but we are not there yet.
     
     //get_Attn_from_Radio();  //sync up with radio
-    Check_radio();
     setAttn(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
+    Check_radio();
     
     //get_AGC_from_Radio();
     AGC(2);
     Check_radio();
 
     //get_Mode_from_Radio();
+    modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A;  // update width in table to current band last used.
     send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
     Check_radio();
     
@@ -302,7 +316,8 @@ COLD void setMode(int8_t dir)
 
     _mndx = (int8_t)bandmem[curr_band].mode_A; // get current mode
 
-    DPRINTF("setMode: Mode Index before change: "); DPRINTLN(bandmem[curr_band].mode_A);
+    DPRINTF("setMode: Mode Index before change: "); DPRINT(bandmem[curr_band].mode_A);
+    DPRINTF(" Dir: "); DPRINTLN(dir);
 
     if (dir < 2)
     {
@@ -331,6 +346,7 @@ COLD void setMode(int8_t dir)
         if (_mndx < 0) // limit in case of encoder counts
             _mndx = 0;    
 
+        DPRINTF("setMode: Mode Index changed to "); DPRINTLN(bandmem[curr_band].mode_A);
         bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
@@ -344,21 +360,24 @@ COLD void setMode(int8_t dir)
         case 0x05:  bandmem[curr_band].agc_mode = AGC_FAST;  // force state to FAST, radio does not auto-report AGC changes
     }
 
-    DPRINTF("setMode: Mode Index after change: "); DPRINTLN(bandmem[curr_band].mode_A);
+    DPRINTF("setMode: Mode Index final: "); DPRINT(bandmem[curr_band].mode_A); DPRINTF("  curr_band: "); DPRINTLN(curr_band);
     
     if (dir < 3)  // Only update radio for local button pushes
         send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
     displayMode();
-    get_AGC_from_Radio();  // let the radio update to the per mode AGC setting it has
-    get_Attn_from_Radio(); // radio wont tell us it changed so have to ask
-    get_Preamp_from_Radio(); // radio wont tell us it changed so have to ask
+    displayFilter();
+    displayDATA();
+
+    //get_AGC_from_Radio();  // let the radio update to the per mode AGC setting it has
+    //get_Attn_from_Radio(); // radio wont tell us it changed so have to ask
+    //get_Preamp_from_Radio(); // radio wont tell us it changed so have to ask
 }
 
 // ---------------------------Filter() ---------------------------
 //   selects old or new value and updates buttons, labels to match
 //
-//  Input: 0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
+//  Input:  0 = step to next based on last direction (starts upwards).  Ramps up then down then up.
 //          1 = step up 1 filter (wider)
 //         -1 = step down 1 filter (narrower)
 //          2 = use last filter width used in this mode from the dB (from modeList table)
@@ -370,7 +389,7 @@ COLD void setMode(int8_t dir)
 COLD void Filter(int8_t dir)
 {
     static int8_t direction = 1;
-    int8_t _bw             = bandmem[curr_band].filter_A; // Change Bandwidth  - cycle down then back to the top
+    int8_t _bw  = bandmem[curr_band].filter_A; // Change Bandwidth  - cycle down then back to the top
 
     if (dir < 2)
     {
@@ -406,9 +425,16 @@ COLD void Filter(int8_t dir)
         _bw = FILT1;
         dir = 3;  // do not send to radio, it is already there in DD mode
     }
+    
+    if (_bw == bandmem[curr_band].filter_A)
+    {
+        modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A = (uint8_t) _bw;  // ensure modeList is sync'd up for current mode and band
+        return;  // mothing changed so do nothing 
+    }
+
     modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A = (uint8_t) _bw;
 
-    DPRINTF("Set Filter to "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);
+    DPRINTF("Filter: Set Filter to "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);
 
     if (dir < 3)
         send_Mode_to_Radio(bandmem[curr_band].mode_A);
@@ -680,12 +706,12 @@ COLD void setAttn(int8_t toggle)
             if (bandmem[curr_band].attenuator) 
             {
                 delay(20);
-                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_ON].cmdData), CIV_D_NIX, CIV_wChk);
+                CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_ON].cmdData), CIV_D_NIX, CIV_wChk);
                 DPRINTF("setAttn: Send to Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
             }
             else
             {
-                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+                CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_OFF].cmdData), CIV_D_NIX, CIV_wChk);
                 DPRINTF("setAttn: Send to Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
             }
         }
@@ -784,12 +810,12 @@ COLD void Preamp(int8_t toggle)
         {
             if (bandmem[curr_band].preamp) 
             {
-                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_ON].cmdData), CIV_D_NIX, CIV_wChk);
+                CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_ON].cmdData), CIV_D_NIX, CIV_wChk);
                 DPRINTF("Preamp: Send to Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
             }
             else
             {
-                CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+                CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_OFF].cmdData), CIV_D_NIX, CIV_wChk);
                 DPRINTF("Preamp: Send to Radio OFF: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
             }
         }
@@ -1701,7 +1727,7 @@ COLD void Band(uint8_t new_band)
         {
             if (curr_band == new_band) // already on this band so new request must be for bandstack, cycle through, saving changes each time
             {
-                DPRINT("Previous VFO A on Band ");
+                DPRINT("Band: Previous VFO A on Band ");
                 DPRINTLN(curr_band);
                 uint64_t temp_vfo_last;
                 uint8_t temp_mode_last;
@@ -1718,7 +1744,7 @@ COLD void Band(uint8_t new_band)
             }
             else
             {
-                DPRINT("Last VFO A on Band ");
+                DPRINT("Band: Last VFO A on Band ");
                 DPRINTLN(new_band);
                 VFOA = bandmem[new_band].vfo_A_last; // let changeBands compute new band based on VFO frequency
             }
@@ -1803,7 +1829,7 @@ COLD void selectAgc(uint8_t andx)
 // Turns meter off
 void clearMeter(void)
 {
-    DPRINTLN("Turn OFF meter");
+    DPRINTLN("clearMeter: Turn OFF meter");
     MeterInUse = false;
     // blank out text line from overruns
     draw_2_state_Button(SMETER_BTN, &std_btn[SMETER_BTN].show);
@@ -1827,7 +1853,7 @@ void setEncoderMode(uint8_t role)
 {
     if (MF_client != role) // Probably don't do this if assigned to a multifunction knob sicne it is temporary
     {
-        DPRINT("Encoder Switch ID = ");
+        DPRINT("setEncoderMode: Encoder Switch ID = ");
         DPRINTLN(role);
         int slot;
         // find enabled aux encoders in order of slot assignment and copy to local var for processing in a loop, skip VFO slot
@@ -1846,7 +1872,7 @@ void setEncoderMode(uint8_t role)
                 _tap      = encoder_list[slot].tap;
                 _press    = encoder_list[slot].press;
 
-                DEBUG_PRINTF("Slot#=%1d type=%1d id=0x%1d enabled=%1d MFENC?=%2d RoleA=%2d, A_active=%1d RoleB=%2d TAP=%2d PRESS=%2d\n",
+                DEBUG_PRINTF("setEncoderMode: Slot#=%1d type=%1d id=0x%1d enabled=%1d MFENC?=%2d RoleA=%2d, A_active=%1d RoleB=%2d TAP=%2d PRESS=%2d\n",
                             slot, _type, _id, _enabled, _mfenc, _roleA, _a_active, _roleB, _tap, _press);
             #else
                 uint8_t _tap;
@@ -1865,7 +1891,7 @@ void setEncoderMode(uint8_t role)
                     case SW4_BTN:
                     case SW5_BTN:
                     case SW6_BTN:
-                        DPRINT("Toggle Active Control ");
+                        DPRINT("setEncoderMode: Toggle Active Control ");
                         DPRINTLN(role);
                         encoder_list[slot].a_active ^= 1;
                         update_icon_outline();
@@ -2006,16 +2032,17 @@ COLD uint8_t get_Mode_from_Radio(void)
 {
     CIVresult_t CIVresultL_mode;
 
-    CIVresultL_mode = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26A].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL_mode = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26A].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
     Check_radio();
     return CIVresultL_mode.retVal;
 }
 
-// Used to set remote's mode to what heh radio reported, usually by getmode()
+// Used to set remote's mode in the database to what the radio reported, usually by getmode()
 COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
     DPRINTF("set_Mode_from_Radio: requests mode index ");  DPRINTLN(mndx);  
+
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
         DPRINTF("set_Mode_from_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
@@ -2024,7 +2051,8 @@ COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current acti
 
     DPRINT("set_Mode_from_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
     bandmem[curr_band].mode_A = mndx; // get current mode table index
-    
+    setMode(3);
+
     displayDATA(); // update display
     displayMode();
     displayFilter();
@@ -2055,14 +2083,14 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     else 
         radio_data = bandmem[curr_band].data_A = 0;  // set DATA on or off 
 
-    DPRINTF("send_Mode_to_Radio: BCD mode_num = "); DPRINT(modeList[mndx].mode_num, HEX);
-    DPRINTF("  filter width = "); DPRINTLN(modeList[mndx].Width);
-
-    radio_mode = modeList[mndx].mode_num;  // now in BCD form
-    radio_filter = bandmem[curr_band].filter_A = modeList[mndx].Width;
     
-    DPRINTF("send_Mode_to_Radio: radio_mode = "); DPRINT(radio_mode, HEX);
-    DPRINTF(" radio_filter = "); DPRINTLN(radio_filter);
+    radio_mode   = modeList[mndx].mode_num;  // now in BCD form
+    radio_filter = bandmem[curr_band].filter_A = modeList[mndx].Width;
+
+    DPRINTF("send_Mode_to_Radio: radio_mode = "); DPRINT(radio_mode, HEX);  // BCD value
+    DPRINTF("  BCD mode_num = "); DPRINT(modeList[mndx].mode_num, HEX); // our dec index
+    DPRINTF("  modeList filter = "); DPRINT(modeList[mndx].Width); // associated width, should match Filter_A
+    DPRINTF("  filter_A = "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);  // Filter A human name
 
     //    bandmem[curr_band].data_A = 1;  // set DATA on or off 
 
@@ -2072,15 +2100,15 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     data_str[2] = radio_data;  // set DATA on or off 
     data_str[3] = radio_filter;  // Set filter
     
-    DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("    Data: "); DPRINTLN(radio_data);    
+    //DPRINTF("send_Mode_to_Radio: Mode: "); DPRINT(modeList[mndx].mode_label); DPRINTF("  Filter: "); DPRINT(filter[radio_filter].Filter_name); DPRINTF("    Data: "); DPRINTLN(radio_data);    
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_F26A].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
-    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MOD_READ].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
-    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_F26A].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
+    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MOD_READ].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
+    //CIVresultL_vfo = civ.writeMsg(CIV_ADDR, data_str, CIV_D_NIX, CIV_wChk);
     //while (CIVresultL_vfo.retVal > CIV_OK_DAV)
     //{
     //    delay(40);
-    //    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, data_str, CIV_D_NIX, CIV_wChk);
+    //    CIVresultL_vfo = civ.writeMsg(CIV_ADDR, data_str, CIV_D_NIX, CIV_wChk);
     //    DPRINTF("send_Mode_to_Radio: delay loop ret = "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);  
     //}
     
@@ -2111,7 +2139,7 @@ COLD uint8_t read_BSTACK_from_Radio(uint8_t band, uint8_t reg)   // Ask the radi
     data_str[1] = band;  // send the mode values
     data_str[2] = reg;  // send the mode values
 
-    CIVresultL_vfo = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_BSTACK].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
+    CIVresultL_vfo = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_BSTACK].cmdData), reinterpret_cast<const uint8_t*>(data_str), CIV_wChk);
     //DPRINTF("read_BSTACK_from_Radio: retVal of BSTACK writeMsg: "); DPRINTLN(retValStr[CIVresultL_vfo.retVal]);
     delay(20);
     Check_radio();
@@ -2128,7 +2156,7 @@ COLD uint64_t get_Freq_from_Radio(void)   // Change Mode of the current active V
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
+    CIVresultL = civ.writeMsg(CIV_ADDR, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
     DPRINTF("get_Freq_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     //return CIVresultL.value;  // return 
     delay(20);
@@ -2141,7 +2169,7 @@ COLD uint8_t get_RXTX_from_Radio(void)   // Change Mode of the current active VF
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_TX].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_TX].cmdData), CIV_D_NIX, CIV_wChk);
     //DPRINTF("get_RXTX_from_Radio: retVal of RX TX: "); DPRINTLN(retValStr[CIVresultL.value]);
     Check_radio();
     return CIVresultL.value;
@@ -2152,12 +2180,12 @@ COLD uint8_t get_MY_POSITION_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_UTC_OFFSET].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_UTC_OFFSET].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of UTC Offset: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(60);
     check_CIV(millis());  // give time to respond -  Msg_type 3 is bstack results
     
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MY_POSIT_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_MY_POSIT_READ].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_MY_POSITION_from_Radio: retVal of MY POS: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(60);
     check_CIV(millis());  // give time to respond -  Msg_type 3 is bstack results
@@ -2172,7 +2200,7 @@ COLD uint8_t get_Preamp_from_Radio(void)
 
     if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
+        CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
         DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
         delay(20);
         Check_radio();
@@ -2192,7 +2220,7 @@ COLD uint8_t get_Attn_from_Radio(void)
 
     if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
     {
-        CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
+        CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
         DPRINTF("get_Attn_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
         delay(20);
         Check_radio();
@@ -2210,7 +2238,7 @@ COLD uint8_t get_AGC_from_Radio(void)
 {
     CIVresult_t CIVresultL;
 
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_READ].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("get_AGC_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
@@ -2223,22 +2251,21 @@ COLD uint8_t send_AGC_to_Radio(void)
     CIVresult_t CIVresultL;
     
     cmd_List[CIV_C_AGC_FAST].cmdData[3] = bandmem[curr_band].agc_mode;
-    CIVresultL = civ.writeMsg(CIV_ADDR_905, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_FAST].cmdData), CIV_D_NIX, CIV_wChk);
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_FAST].cmdData), CIV_D_NIX, CIV_wChk);
     DPRINTF("send_AGC_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
 }
 
-// Very basic - oupuits a set pattern for each band.  Follows the ELecraft K3 patther for comnbined HF and VHF used for transverters and antenna swicthing
+// Very basic - outputs a set pattern for each band.  Follows the Elecraft K3 patther for combined HF and VHF used for transverters and antenna switching
 // This may control a external band decoder that accept wired inputs.  Other decoder outpout can be serial or ethernet
 void Band_Decode_Output(uint8_t band)
 {
-    // Convert frequency band to a parallel wire GPIO putput pattern.
-    // On a Elecraft K3 this is equivalent to the HF-TRN mode.  Digout is used in combo with Band Decode BCD 0-3 pins.  
+    // Convert frequency band to a parallel wire GPIO output pattern.
+    // On an Elecraft K3 this is equivalent to the HF-TRN mode.  DigOut is used in combo with Band Decode BCD 0-3 pins.  
     // The pattern 0xYYXX where YY is 01 for VHF+ band group and 00 for HF band group.  XX is the band identifier witin each HF and VHF group.
-    // Edit this to be anyting you want.
-    // Set your desired patterns in RAdioConfig.h
+    // Set your desired patterns in RadioConfig.h
     // ToDo: Eventually create a local UI screen to edit and monitor pin states
 
     DPRINTF("Band_Decode_Output: Band: "); DPRINTLN(band);
@@ -2278,16 +2305,73 @@ void GPIO_Out(uint8_t pattern)
     DPRINTF("GPIO_Out: pattern:  DEC "); DPRINT(pattern);
     DPRINTF("  HEX "); DPRINT(pattern, HEX);
     DPRINTF("  Binary "); DPRINTLN(pattern, BIN);
-    
+
     // mask each bit and apply the 1 or 0 to the assigned pin
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_0, pattern & 0x01);  // bit 0
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_1, pattern & 0x02);  // bit 1
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_2, pattern & 0x04);  // bit 2
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_3, pattern & 0x08);  // bit 3
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_4, pattern & 0x10);  // bit 4
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_5, pattern & 0x20);  // bit 5
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_6, pattern & 0x40);  // bit 6
-    digitalWrite(BAND_DECODE_OUTPUT_PIN_7, pattern & 0x80);  // bit 7
+    if (BAND_DECODE_OUTPUT_PIN_0 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_0, pattern & 0x01);  // bit 0
+    if (BAND_DECODE_OUTPUT_PIN_1 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_1, pattern & 0x02);  // bit 1
+    if (BAND_DECODE_OUTPUT_PIN_2 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_2, pattern & 0x04);  // bit 2
+    if (BAND_DECODE_OUTPUT_PIN_3 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_3, pattern & 0x08);  // bit 3
+    if (BAND_DECODE_OUTPUT_PIN_4 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_4, pattern & 0x10);  // bit 4
+    if (BAND_DECODE_OUTPUT_PIN_5 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_5, pattern & 0x20);  // bit 5
+    if (BAND_DECODE_OUTPUT_PIN_6 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_6, pattern & 0x40);  // bit 6
+    if (BAND_DECODE_OUTPUT_PIN_7 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_OUTPUT_PIN_7, pattern & 0x80);  // bit 7
+}
+
+void PTT_Output(uint8_t band, uint8_t PTT_state)
+{
+    // Set your desired PTT pattern per band in RadioConfig.h
+    // ToDo: Eventually create a local UI screen to edit and monitor pin states
+
+    PTT_state = (PTT_state > 0) ? PTT_state = 1 : PTT_state = 0;  // ensure it is 0 or 1
+
+    DPRINTF("Band_Decode_Output: Band: "); DPRINTLN(band);
+
+    switch (band)
+    {
+       case  BAND160M : GPIO_PTT_Out(DECODE_BAND160M_PTT, PTT_state); break;  //160M 
+       case  BAND80M  : GPIO_PTT_Out(DECODE_BAND80M_PTT, PTT_state); break;   //80M
+       case  BAND60M  : GPIO_PTT_Out(DECODE_BAND60M_PTT, PTT_state); break;   //60M
+       case  BAND40M  : GPIO_PTT_Out(DECODE_BAND40M_PTT, PTT_state); break;   //40M
+       case  BAND30M  : GPIO_PTT_Out(DECODE_BAND30M_PTT, PTT_state); break;   //30M
+       case  BAND20M  : GPIO_PTT_Out(DECODE_BAND20M_PTT, PTT_state); break;   //20M
+       case  BAND17M  : GPIO_PTT_Out(DECODE_BAND17M_PTT, PTT_state); break;   //17M      
+       case  BAND15M  : GPIO_PTT_Out(DECODE_BAND15M_PTT, PTT_state); break;   //15M
+       case  BAND12M  : GPIO_PTT_Out(DECODE_BAND12M_PTT, PTT_state); break;   //12M
+       case  BAND10M  : GPIO_PTT_Out(DECODE_BAND10M_PTT, PTT_state); break;   //10M
+       case  BAND6M   : GPIO_PTT_Out(DECODE_BAND6M_PTT, PTT_state); break;    //6M
+        //case BAND70   : GPIO_PTT_Out(0x01_PTT, PTT_state); break;   //6M
+       case  BAND144  : GPIO_PTT_Out(DECODE_BAND144_PTT, PTT_state); break;   //2M
+       case  BAND222  : GPIO_PTT_Out(DECODE_BAND222_PTT, PTT_state); break;   //222
+       case  BAND432  : GPIO_PTT_Out(DECODE_BAND432_PTT, PTT_state); break;   //432
+       case  BAND902  : GPIO_PTT_Out(DECODE_BAND902_PTT, PTT_state); break;   //902
+       case  BAND1296 : GPIO_PTT_Out(DECODE_BAND1296_PTT, PTT_state); break;  //1296
+       case  BAND2400 : GPIO_PTT_Out(DECODE_BAND2400_PTT, PTT_state); break;  //2400
+       case  BAND3400 : GPIO_PTT_Out(DECODE_BAND3400_PTT, PTT_state); break;  //3400
+       case  BAND5760 : GPIO_PTT_Out(DECODE_BAND5760_PTT, PTT_state); break;  //5760M
+       case  BAND10G  : GPIO_PTT_Out(DECODE_BAND10G_PTT, PTT_state); break;   //10.368.1G
+       case  BAND24G  : GPIO_PTT_Out(DECODE_BAND24G_PTT, PTT_state); break;   //24.192G
+       case  BAND47G  : GPIO_PTT_Out(DECODE_BAND47G_PTT, PTT_state); break;   //47.1G
+       case  BAND76G  : GPIO_PTT_Out(DECODE_BAND76G_PTT, PTT_state); break;   //76.1G
+       case  BAND122G : GPIO_PTT_Out(DECODE_BAND122G_PTT, PTT_state); break;  //122G
+    }
+}
+
+void GPIO_PTT_Out(uint8_t pattern, uint8_t PTT_state)
+{
+    PTT_state = (PTT_state > 0) ? PTT_state = 1 : PTT_state = 0;  // ensure it is 0 or 1
+
+    DPRINTF("  PTT state "); DPRINT(PTT_state, BIN);
+    DPRINTF("  PTT Output Binary "); DPRINTLN(pattern & PTT_state, BIN);
+
+    // mask each bit and apply the 1 or 0 to the assigned pin
+    if (BAND_DECODE_PTT_OUTPUT_PIN_0 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_0, pattern & 0x01 & PTT_state);  // bit 0
+    if (BAND_DECODE_PTT_OUTPUT_PIN_1 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_1, pattern & 0x02);  // bit 1
+    if (BAND_DECODE_PTT_OUTPUT_PIN_2 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_2, pattern & 0x04);  // bit 2
+    if (BAND_DECODE_PTT_OUTPUT_PIN_3 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_3, pattern & 0x08);  // bit 3
+    if (BAND_DECODE_PTT_OUTPUT_PIN_4 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_4, pattern & 0x10);  // bit 4
+    if (BAND_DECODE_PTT_OUTPUT_PIN_5 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_5, pattern & 0x20);  // bit 5
+    if (BAND_DECODE_PTT_OUTPUT_PIN_6 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_6, pattern & 0x40);  // bit 6
+    if (BAND_DECODE_PTT_OUTPUT_PIN_7 != GPIO_PIN_NOT_USED) digitalWrite(BAND_DECODE_PTT_OUTPUT_PIN_7, pattern & 0x80);  // bit 7
 }
 
 void Decoder_GPIO_Pin_Setup(void)
@@ -2296,14 +2380,26 @@ void Decoder_GPIO_Pin_Setup(void)
     // The pins used here are defined in RadioConfig.  The one GPIO_SWx_PIN were designated as hardware switches in the Teensy SDR 
     // If using the Teensy SDR motherboard and you have physical switch hardware on any of these then you need to pick alernate pins.
     // Most pins are alrewady goiven a #define bname in RadioCOnfig, substitute the right ones in here.  Make sure they are free.
-    pinMode(BAND_DECODE_OUTPUT_PIN_0, OUTPUT);  // bit 0
-    pinMode(BAND_DECODE_OUTPUT_PIN_1, OUTPUT);  // bit 1
-    pinMode(BAND_DECODE_OUTPUT_PIN_2, OUTPUT);  // bit 2
-    pinMode(BAND_DECODE_OUTPUT_PIN_3, OUTPUT);  // bit 3
-    pinMode(BAND_DECODE_OUTPUT_PIN_4, OUTPUT);  // bit 4
-    pinMode(BAND_DECODE_OUTPUT_PIN_5, OUTPUT);  // bit 5
-    pinMode(BAND_DECODE_OUTPUT_PIN_6, OUTPUT);  // bit 6
-    pinMode(BAND_DECODE_OUTPUT_PIN_7, OUTPUT);  // bit 7
+
+    // set up our Decoder output pins if enabled
+    if (BAND_DECODE_OUTPUT_PIN_0 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_0, OUTPUT);  // bit 0
+    if (BAND_DECODE_OUTPUT_PIN_1 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_1, OUTPUT);  // bit 1
+    if (BAND_DECODE_OUTPUT_PIN_2 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_2, OUTPUT);  // bit 2
+    if (BAND_DECODE_OUTPUT_PIN_3 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_3, OUTPUT);  // bit 3
+    if (BAND_DECODE_OUTPUT_PIN_4 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_4, OUTPUT);  // bit 4
+    if (BAND_DECODE_OUTPUT_PIN_5 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_5, OUTPUT);  // bit 5
+    if (BAND_DECODE_OUTPUT_PIN_6 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_6, OUTPUT);  // bit 6
+    if (BAND_DECODE_OUTPUT_PIN_7 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_OUTPUT_PIN_7, OUTPUT);  // bit 7
     
+    // set up our PTT breakout pins if enabled
+    if (BAND_DECODE_PTT_OUTPUT_PIN_0 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_0, OUTPUT);  // bit 0
+    if (BAND_DECODE_PTT_OUTPUT_PIN_1 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_1, OUTPUT);  // bit 1
+    if (BAND_DECODE_PTT_OUTPUT_PIN_2 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_2, OUTPUT);  // bit 2
+    if (BAND_DECODE_PTT_OUTPUT_PIN_3 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_3, OUTPUT);  // bit 3
+    if (BAND_DECODE_PTT_OUTPUT_PIN_4 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_4, OUTPUT);  // bit 4
+    if (BAND_DECODE_PTT_OUTPUT_PIN_5 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_5, OUTPUT);  // bit 5
+    if (BAND_DECODE_PTT_OUTPUT_PIN_6 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_6, OUTPUT);  // bit 6
+    if (BAND_DECODE_PTT_OUTPUT_PIN_7 != GPIO_PIN_NOT_USED) pinMode(BAND_DECODE_PTT_OUTPUT_PIN_7, OUTPUT);  // bit 7
+     
     DPRINTLNF("Decoder_GPIO_Pin_Setup: Pin Mode Setup complete");
 }

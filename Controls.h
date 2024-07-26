@@ -75,5 +75,7 @@ uint64_t get_Freq_from_Radio(void);
 void Band_Decode_Output(uint8_t band);
 void GPIO_Out(uint8_t pattern);
 void Decoder_GPIO_Pin_Setup(void);
+void GPIO_PTT_Out(uint8_t pattern, uint8_t PTT_state);
+void PTT_Output(uint8_t band, uint8_t PTT_state);
 
 #endif  // _CONTROLS_H_
