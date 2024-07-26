@@ -244,7 +244,6 @@ void write_db_tables(void)
 
 void read_db_tables(void)
 {
-    uint8_t PRESETS = 1;
     SDR_sd_file = SD.open("radiocfg.db", FILE_READ);
     
     // if the file is available, read it:
