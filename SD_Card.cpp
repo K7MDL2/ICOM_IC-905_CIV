@@ -13,6 +13,7 @@
 extern struct   Spectrum_Parms      Sp_Parms_Def[];
 extern struct   Band_Memory         bandmem[];
 extern struct   User_Settings       user_settings[];
+extern struct   Modes_List          modeList[] ;
 extern uint8_t  user_Profile;
 
 // *******************************   SD Card  ************************************************************
@@ -212,17 +213,16 @@ void write_db_tables(void)
             memmove(dataS, &bandmem[i], sizeof(bandmem[i]));
             SDR_sd_file.write(dataS, sizeof(dataS));
         }
-        
-        uint8_t PRESETS = 1;
-        // Spectrum table       
-        for (int i = 0; i < PRESETS; i++)
+
+        // Filter setting per mode on a current band         
+        for (int i = 0; i < BANDS; i++)
         {
-            //byte dataS[sizeof(Sp_Parms_Def[0])];;
-            //memmove(dataS, &Sp_Parms_Def[i], sizeof(Sp_Parms_Def[i]));
-            //SDR_sd_file.write(dataS, sizeof(dataS));
+            byte dataS[sizeof(modeList[0])];
+            memmove(dataS, &modeList[i], sizeof(modeList[i]));
+            SDR_sd_file.write(dataS, sizeof(dataS));
         }
 
-        // reads for later
+        // writes for later
             //SDR_sd_file.read(dataS, sizeof(dataS));  //read it back
             //memmove(&user_settings[0], dataS, sizeof(user_settings[i]));
 
@@ -267,13 +267,14 @@ void read_db_tables(void)
             memmove(&bandmem[i], dataS, sizeof(bandmem[i]));
         }
         
-        // Spectrum table         
-        for (int i = 0; i < PRESETS; i++)
+                // Filter setting per mode on a current band         
+        for (int i = 0; i < BANDS; i++)
         {
-            //byte dataS[sizeof(Sp_Parms_Def[0])];;
-            //SDR_sd_file.read(dataS, sizeof(dataS));
-            //memmove(&Sp_Parms_Def[i], dataS, sizeof(Sp_Parms_Def[i]));
+            byte dataS[sizeof(modeList[0])];
+            SDR_sd_file.read(dataS, sizeof(dataS));
+            memmove(&modeList[i], dataS, sizeof(modeList[i]));
         }
+
 
         Serial.println("\nClose File");
         SDR_sd_file.close();
