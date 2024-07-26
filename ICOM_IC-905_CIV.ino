@@ -191,32 +191,32 @@ Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
 Metro CAT_RX_TX_Check      = Metro(300);   // Clear the CIV log buffer
 
-int64_t     xvtr_offset             = 0;
-int16_t     rit_offset              = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
-int16_t     xit_offset              = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
-int16_t     rit_offset_last         = 0;    // track last used value when turning the RIT on and off. 
-int16_t     xit_offset_last         = 0;    // track last used value when turning the RIT on and off. 
+int64_t     xvtr_offset     = 0;
+int16_t     rit_offset      = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
+int16_t     xit_offset      = 0;    // global XIT offset value in Hz. -9999Hz to +9999H
+int16_t     rit_offset_last = 0;    // track last used value when turning the RIT on and off. 
+int16_t     xit_offset_last = 0;    // track last used value when turning the RIT on and off. 
 //
 //----------------------------------------------------------------------------------------------------------------------------
 //
 // These should be saved in EEPROM periodically along with several other parameters
-uint8_t     curr_band   = BAND80M;  // global tracks our current band setting.  
-uint64_t    VFOA        = 0;        // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
-uint64_t    VFOB        = 0;
-int64_t     Fc          = 0;        //(sample_rate_Hz/4);  // Center Frequency - Offset from DC to see band up and down from cener of BPF.   Adjust Displayed RX freq and Tx carrier accordingly
-int32_t     ModeOffset  = 0;        // Holds offset based on CW mode pitch
-uint8_t     default_MF_slot         = 0;    // default MF client assignment slot 
-float       S_Meter_Peak_Avg;              // For RF AGC Limiter
-bool        MeterInUse;  // S-meter flag to block updates while the MF knob has control
-int32_t     Freq_Peak    = 0;
-uint8_t     display_state;   // something to hold the button state for the display pop-up window later.
-bool        touchBeep_flag          = false;
-uint8_t     popup        = 0;   // experimental flag for pop up windows
-static uint32_t delta    = 0;
-uint8_t lpCnt = 0;
-uint8_t     radio_mode   = 0;       // mode from radio messages
-uint8_t     radio_filter = 0;     // filter from radio messages
-uint8_t     radio_data   = 0;       //  DATA on/off  from radio messages
+uint8_t     curr_band       = BAND80M;  // global tracks our current band setting.  
+uint64_t    VFOA            = 0;    // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
+uint64_t    VFOB            = 0;
+int64_t     Fc              = 0;    //(sample_rate_Hz/4);  // Center Frequency - Offset from DC to see band up and down from cener of BPF.   Adjust Displayed RX freq and Tx carrier accordingly
+int32_t     ModeOffset      = 0;    // Holds offset based on CW mode pitch
+uint8_t     default_MF_slot = 0;    // default MF client assignment slot 
+float       S_Meter_Peak_Avg;       // For RF AGC Limiter
+bool        MeterInUse;             // S-meter flag to block updates while the MF knob has control
+int32_t     Freq_Peak       = 0;
+uint8_t     display_state;          // something to hold the button state for the display pop-up window later.
+bool        touchBeep_flag  = false;
+uint8_t     popup           = 0;    // experimental flag for pop up windows
+static uint32_t delta       = 0;
+uint8_t     lpCnt           = 0;
+volatile uint8_t radio_mode   = 0;    // mode from radio messages
+uint8_t     radio_filter    = 0;    // filter from radio messages
+uint8_t     radio_data      = 0;    //  DATA on/off  from radio messages
 
 // ************************************************* Setup *****************************************
 //
@@ -225,8 +225,8 @@ uint8_t     radio_data   = 0;       //  DATA on/off  from radio messages
 tmElements_t tm;
 time_t prevDisplay = 0; // When the digital clock was displayed
 /* timer  variables */
-unsigned long time_current_baseloop;       // temporary time of the baseloop entry for calculations
-unsigned long time_last_baseloop;          // will be updated at the end of every baseloop run
+unsigned long time_current_baseloop;  // temporary time of the baseloop entry for calculations
+unsigned long time_last_baseloop;     // will be updated at the end of every baseloop run
 #define BASELOOP_TICK 10 
 
 void setup()
@@ -1390,16 +1390,17 @@ uint8_t Check_radio(void)
         curr_band_temp = curr_band;
     }
     else if (ret_val == 2)  // When the radio initiates a band change it sends out basic mode msg followed by frequency
-    // Requeasting a extended (0x26) mode immediately will clobber the frequency message from the radio
+    // Requesting an extended (0x26) mode immediately will clobber the frequency message from the radio
     // the result is both the ext mde and freq are clobbered due to BUS_CONFLICT.
-    // DO the ext mode during band change and not here.  Hard part is knowing. 
+    // Do the ext mode during band change and not here.  Hard part is knowing. 
     // A timer may need to be set to wait is do the ext mode to give time to see if this is part of a radio side band change
-    // IF so can cancel the timer in band change and skip this one sicne it will be done there.
+    // If so can cancel the timer in band change and skip this one sicne it will be done there.
     {
         DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
         setMode(3);
         // sending ext mode request to radio if during a radio side bandchange this reqeast will fail.  Let changeBands do it sicne it follows a band change.
         set_Mode_from_Radio(radio_mode);  // use the info we have.  Missing DATA ON/Off state inb this basic message so next step is to get extended info.
+        delay(50);
         get_Mode_from_Radio();  // get extended data for DATA on/off state
     }
     else if (ret_val == 4)

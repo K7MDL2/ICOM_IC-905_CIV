@@ -181,7 +181,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				case CIV_C_F_SEND:
 				case CIV_C_F1_SEND:
 				{  // command CIV_C_F_SEND received
-					DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
+					//DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
 					VFOA = (uint64_t)CIVresultL.value;
 					msg_type = 1;
 					freqReceived = true;
@@ -193,21 +193,21 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				{  
 					// command CIV_C_MODE_READ received
 					radio_mode = CIVresultL.value/100;
-					DPRINTF("check_CIV: Mode in BCD: "); DPRINT(radio_mode);
+					DPRINTF("\ncheck_CIV: Mode in BCD: "); DPRINTLN(radio_mode);
 					
 					// look up the bcd value in our modelist table to see what radio mode it is 
 					for (uint8_t i = 0; i< MODES_NUM; i++)
 					{
 						if (modeList[i].mode_num == hexToDec(radio_mode))  // match bcd value to table mode_num value to get out mode index that we store
 						{	
-							radio_mode = i;  // now know our index
+							radio_mode = i;  // now know our decimal index
 							break;  
 						}
 					}// radio_mode now converted to a table index
 					
 					radio_filter = CIVresultL.value - ((CIVresultL.value/100)*100);
 					
-					DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Filter: "); DPRINTLN(filter[radio_filter].Filter_name);    
+					DPRINTF("check_CIV: CI-V Returned Mode: "); DPRINT(modeList[radio_mode].mode_label);  DPRINTF("  Radio Mode = "); DPRINT(radio_mode); DPRINTF("  Filter = "); DPRINTLN(filter[radio_filter].Filter_name);    
 					
 					msg_type = 2;
 					freqReceived = false;

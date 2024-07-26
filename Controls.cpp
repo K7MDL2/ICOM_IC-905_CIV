@@ -150,13 +150,13 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     int8_t target_band;
     // TODO search bands column for match to account for mapping that does not start with 0 and bands could be in odd order and disabled.
 
-    DPRINTF("\nchangeBands: Incoming Band is "); DPRINTLN(bandmem[curr_band].band_name); DPRINTF("  Current Freq is "); DPRINT(VFOA); DPRINTF("  Current Last_VFOA is "); DPRINTLN(bandmem[curr_band].vfo_A_last);
+    DPRINTF("\nchangeBands: Previous Band was "); DPRINTLN(bandmem[curr_band].band_name); DPRINTF("  Current Freq is "); DPRINT(VFOA); DPRINTF("  Current Last_VFOA is "); DPRINTLN(bandmem[curr_band].vfo_A_last);
+
+    target_band = bandmem[curr_band].band_num + direction;
+    // target_band = curr_band + direction;    
 
     Split(0);
 
-    target_band = bandmem[curr_band].band_num + direction;
-    // target_band = curr_band + direction;
-    
     DPRINTF("changeBands: Proposed Target Band is "); DPRINTLN(bandmem[target_band].band_name);
 
     uint16_t top_band    = BANDS-1;
@@ -204,8 +204,9 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     
     DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); 
     DPRINTF("  New VFOA is "); DPRINT(VFOA); 
-    DPRINTF("  xvtr_IF is "); DPRINTLN(bandmem[curr_band].xvtr_IF);
-    
+    DPRINTF("  xvtr_IF is "); DPRINT(bandmem[curr_band].xvtr_IF);
+    DPRINTF("  Mode will be "); DPRINTLN(bandmem[curr_band].mode_A);
+
     // Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
     if (bandmem[curr_band].xvtr_IF)
         xvtr_offset = bandmem[curr_band].edge_lower - bandmem[bandmem[curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
@@ -301,7 +302,9 @@ COLD void setMode(int8_t dir)
 
     _mndx = (int8_t)bandmem[curr_band].mode_A; // get current mode
 
-    if (dir != 2)
+    DPRINTF("setMode: Mode Index before change: "); DPRINTLN(bandmem[curr_band].mode_A);
+
+    if (dir < 2)
     {
         // 1. Limit to allowed step range
         // 2. Cycle up and at top, cycle back down, do nto roll over.
@@ -341,6 +344,8 @@ COLD void setMode(int8_t dir)
         case 0x05:  bandmem[curr_band].agc_mode = AGC_FAST;  // force state to FAST, radio does not auto-report AGC changes
     }
 
+    DPRINTF("setMode: Mode Index after change: "); DPRINTLN(bandmem[curr_band].mode_A);
+    
     if (dir < 3)  // Only update radio for local button pushes
         send_Mode_to_Radio((uint8_t) _mndx); // Select the mode for the Active VFO
 
@@ -400,11 +405,12 @@ COLD void Filter(int8_t dir)
     if (modeList[bandmem[curr_band].mode_A].mode_num == 0x22)
     {
         _bw = FILT1;
-        dir =3;  // do nto send to radio, it is already there in DD mode
+        dir = 3;  // do not send to radio, it is already there in DD mode
     }
     modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A = (uint8_t) _bw;
 
     DPRINTF("Set Filter to "); DPRINTLN(filter[bandmem[curr_band].filter_A].Filter_name);
+
     if (dir < 3)
         send_Mode_to_Radio(bandmem[curr_band].mode_A);
     
@@ -1430,10 +1436,6 @@ COLD void PAN(int8_t delta)
 // XMIT button
 COLD void Xmit(uint8_t state) // state ->  TX=1, RX=0; Toggle =2
 {
-    //uint8_t mode_idx;
-
-    //mode_idx = bandmem[curr_band].mode_A;
-
     if ((user_settings[user_Profile].xmit == ON && state == 2) || state == 0) // Transmit OFF
     {
         user_settings[user_Profile].xmit = OFF;
@@ -2014,6 +2016,7 @@ COLD uint8_t get_Mode_from_Radio(void)
 // Used to set remote's mode to what heh radio reported, usually by getmode()
 COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
+    DPRINTF("set_Mode_from_Radio: requests mode index ");  DPRINTLN(mndx);  
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
         DPRINTF("set_Mode_from_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
@@ -2034,12 +2037,17 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     CIVresult_t CIVresultL;
     uint8_t data_str[6] = {};
 
-    if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
-    {
-        DPRINTF("send_Mode_to_Radio: request mode mode not available on bands < 1296: ");  DPRINTLN(modeList[mndx].mode_label);  
-        mndx = MODES_NUM -3;    // go to start of list
-    }
+    DPRINTF("send_Mode_to_Radio: requested mode "); DPRINT(modeList[mndx].mode_label);
     
+    if ((curr_band < BAND1296) && (mndx > MODES_NUM - 3))  // DD and ATV not avaiable on bands < 1296
+    {
+         DPRINTF(" not available on bands < 1296: "); 
+        mndx = MODES_NUM - 3;    // limit index to stat of dig modes ot allowed
+    }
+    DPRINTLNF("");
+
+    bandmem[curr_band].mode_A = mndx;  // set to the request allowed value
+
     DPRINTF("send_Mode_to_Radio: Mode_A index = "); DPRINT(bandmem[curr_band].mode_A);
     DPRINTF(" curr_band = "); DPRINTLN(bandmem[curr_band].band_name);
 
@@ -2081,7 +2089,7 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     
     if (CIVresultL.retVal == CIV_OK)
     {
-        DPRINT("send_Mode_to_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label);  	
+        DPRINT("send_Mode_to_Radio: Set mode to "); DPRINTLN(modeList[mndx].mode_label); DPRINTLN(" ");
         bandmem[curr_band].mode_A = mndx; // get current mode table index
         Check_radio();
         displayMode();
