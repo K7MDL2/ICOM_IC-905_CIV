@@ -241,16 +241,16 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 //  Specify what bands should be skipped. Set to 0 to skip.  1 to enable
 //  For RS-HFIQ (80M-10M) users 160M is disabled. Everything 6M and up is set to 0 unless you have a Xvtr active
 // *****************************************************************************************
-#define ENABLE_160M_BAND  0
-#define ENABLE_80M_BAND   0
-#define ENABLE_60M_BAND   0
-#define ENABLE_40M_BAND   0
-#define ENABLE_30M_BAND   0
-#define ENABLE_20M_BAND   0
-#define ENABLE_17M_BAND   0
-#define ENABLE_15M_BAND   0
-#define ENABLE_12M_BAND   0
-#define ENABLE_10M_BAND   0
+#define ENABLE_160M_BAND  1
+#define ENABLE_80M_BAND   1
+#define ENABLE_60M_BAND   1
+#define ENABLE_40M_BAND   1
+#define ENABLE_30M_BAND   1
+#define ENABLE_20M_BAND   1
+#define ENABLE_17M_BAND   1
+#define ENABLE_15M_BAND   1
+#define ENABLE_12M_BAND   1
+#define ENABLE_10M_BAND   1
 // These are transverter bands common to all RF hardware that covers HF bands to 30MHz.
 // The default IF is 10M band defined in the bandmem table in SDR_DATA.h
 #define ENABLE_6M_BAND    1  // if you hardware does 6M then edit the bandmem table in SDR_DATA.h
@@ -258,11 +258,11 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 #define ENABLE_222_BAND   0
 #define ENABLE_432_BAND   1
 #define ENABLE_902_BAND   0
-#define ENABLE_1296_BAND  1
-#define ENABLE_2400_BAND  1
+#define ENABLE_1296_BAND  0
+#define ENABLE_2400_BAND  0
 #define ENABLE_3400_BAND  0
-#define ENABLE_5760_BAND  1
-#define ENABLE_10G_BAND   1
+#define ENABLE_5760_BAND  0
+#define ENABLE_10G_BAND   0
 #define ENABLE_24G_BAND   0
 #define ENABLE_47G_BAND   0
 #define ENABLE_76G_BAND   0
