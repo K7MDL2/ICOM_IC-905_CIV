@@ -16,9 +16,12 @@ extern Metro CAT_Freq_Check;  // Clear the CIV log buffer
 extern uint8_t curr_band;  // global tracks our current band setting.
 extern uint64_t VFOA;      // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
 extern uint64_t VFOB;
-extern uint8_t radio_mode;         // mode from radio messages
-extern uint8_t radio_filter;       // filter from radio messages
-extern uint8_t radio_data;       // filter from radio messages
+extern uint8_t radio_mode;      // mode from radio messages
+extern uint8_t radio_filter;    // filter from radio messages
+extern uint8_t radio_data;      // filter from radio messages
+extern int16_t radio_RIT;    	// RIT offest 9.999KHz to -9.999KHz from radio CI-V
+extern int32_t radio_DUP;		// Radio Duplex Offset
+extern uint8_t radio_RIT_On_Off;
 extern uint8_t user_Profile;
 extern struct Band_Memory bandmem[];
 extern struct Modes_List modeList[];
@@ -83,7 +86,14 @@ struct cmdList cmd_List[End_of_Cmd_List] = {
     {CIV_C_TIME,            {4,0x1A,0x05,0x00,0x95}},  		// + 0x19 0x57 for 19:57
     {CIV_C_UTC,             {4,0x1A,0x05,0x00,0x96}},  		// + 0x01,0x00,0x00 = +1h delta of UTC to MEZ
     {CIV_C_UTC_OFFSET,      {4,0x1A,0x05,0x01,0x81}},       //  Get UTC Offset
-    {CIV_C_UTC_SEND,        {4,0x1A,0x05,0x00,0x96}}  		// + 0x01,0x00,0x00 = +1h delta of UTC to MEZ
+    {CIV_C_UTC_SEND,        {4,0x1A,0x05,0x00,0x96}},  		// + 0x01,0x00,0x00 = +1h delta of UTC to MEZ
+	{CIV_C_DUPLEX_READ,		{1,0x0C}},          	    	// read Duplex Offset  - has 3 bytes frequency offset data
+    {CIV_C_DUPLEX_SEND,		{1,0x0D}},	          	    	// send Duplex Offset
+	{CIV_C_RIT_XIT,			{2,0x21,0x00}},          	    // read or send RIT/XIT Offset  - has 3 bytes frequency offset data  XIT and RIT share this Offset value
+	{CIV_C_RIT_ON_OFF,		{2,0x21,0x01}},	          	    // send or send RIT ON or Off status 00 = , 01 = t
+	{CIV_C_XIT_ON_OFF,		{2,0x21,0x02}},	          	    // send or send XIT Offset
+	{CIV_C_RADIO_OFF,		{2,0x18,0x00}},	          	    // Turn Off the radio
+	{CIV_C_RADIO_ON,		{2,0x18,0x01}}	          	    // Turn on the radio
 };
 
 int hr_off;  // time offsets to apply to UTC time
@@ -102,7 +112,8 @@ CIV civ;  // create the CIV-Interface object
 
 CIVresult_t CIVresultL;
 
-void civ_905_setup(void) {
+void civ_905_setup(void) 
+{
   civ.setupp(true, false, "");     // initialize the civ object/module
                                    // and the ICradio objects
   civ.registerAddr(CIV_ADDR);  // tell civ, that this is a valid address to be used
@@ -229,9 +240,15 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 
 					DPRINTF("check_CIV: CI-V Returned Band Stack - Band: "); DPRINT(bstack_band); DPRINTF("  Register: "); DPRINT(bstack_reg);
 						
-					uint8_t F_len = 6;	// 6 bytes for IC905
+					uint8_t F_len;
+
+					if (CIV_ADDR == CIV_ADDR_905) 
+						F_len = 6;	// 6 bytes for IC905
+					else
+						F_len = 5;	// 6 bytes for IC705 and other models < 10Ghz
+					
 					uint8_t idx = 0;
-					uint8_t DstartIdx = 3;  // start of freq for 12 bytes
+					uint8_t DstartIdx = 3;  // start of freq for 6 bytes for IC905, 5 for other models
 					uint8_t DstopIdx = DstartIdx + F_len;  // start of mode, filter data on/off will be 1-3 bytes after
 					uint8_t rxBuffer[F_len];  // hold 6 bytes of frequency
 					uint64_t mul = 1;
@@ -482,6 +499,68 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					displayAgc();
 					break;
 				}  // AGC changed
+
+				case CIV_C_DUPLEX_READ:
+				case CIV_C_DUPLEX_SEND:
+				{
+					//              Dup            1k/100Hz   100K/10Khz    10M/1MHz    term
+					// FE.FE.E0.AC. 0C.               01.        81.          00.        FD
+					//					 datalen=3   
+					// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
+
+					//uint8_t DUP_10MHZ 	= bcdByte(CIVresultL.datafield[3] & 0xF0); 
+					//uint8_t DUP_1MHZ 	= bcdByte(CIVresultL.datafield[3] & 0x0F); 
+					
+					//uint8_t DUP_100KHZ 	= bcdByte(CIVresultL.datafield[2] & 0xF0); 
+					//uint8_t DUP_10KHZ 	= bcdByte(CIVresultL.datafield[2] & 0x0F); 
+
+					//uint8_t DUP_1KHZ 	= bcdByte(CIVresultL.datafield[1] & 0xF0);
+					//uint8_t DUP_100HZ 	= bcdByte(CIVresultL.datafield[1] & 0x0F);
+					
+				
+					//int8_t DUP_MINUS 	= CIVresultL.datafield[3];    // 00 = plus, 01 - minus
+					radio_DUP 	   = bcdByte(CIVresultL.datafield[3])*1000;
+					radio_DUP  	  += bcdByte(CIVresultL.datafield[2])*10; 
+					radio_DUP  	  += bcdByte(CIVresultL.datafield[1]); 
+					radio_DUP 	  *= 1000;  //convert KHz to Hz
+					//radio_DUP = DUP_MINUS ?  radio_DUP*-1: radio_DUP;
+					DPRINTF("check_CIV: Radio Returned Duplex Offset: "); DPRINT(radio_DUP); DPRINTLNF("Hz");
+
+					msg_type = 11;
+					freqReceived = false;
+					break;
+				}  // Duplex Offset
+
+				case CIV_C_RIT_XIT:
+				{
+					// RIT -1.97KHz
+					//              RIT            1k/100Hz   10/1hz   +/1    term
+					// FE.FE.E0.AC. 21.00              01.      97.     01.     FD
+					//					 datalen[0]=3   
+										//                                     
+					// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
+
+					int8_t RIT_MINUS = CIVresultL.datafield[3];    // 00 = plus, 01 - minus
+					radio_RIT 		 = bcdByte(CIVresultL.datafield[2])* 100; // * -RIT_MINUS; 
+					radio_RIT  	    += bcdByte(CIVresultL.datafield[1]); 
+					radio_RIT = RIT_MINUS ?  radio_RIT*-1: radio_RIT;
+					DPRINTF("check_CIV: RIT Offset: "); DPRINT(radio_RIT); DPRINTLNF("Hz");
+
+					msg_type = 12;
+					freqReceived = false;
+					break;
+				}  // RIT Offset
+
+				case CIV_C_RIT_ON_OFF:
+				{	// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
+					
+					radio_RIT_On_Off  	    = bcdByte(CIVresultL.datafield[1]); 
+					DPRINTF("check_CIV: RIT Offset: "); DPRINTLN(radio_RIT_On_Off);
+					msg_type = 12;
+					freqReceived = false;
+					break;
+				}  // RIT Offset
+
 			}  // end switch
 			return msg_type;
     	}  // Data available

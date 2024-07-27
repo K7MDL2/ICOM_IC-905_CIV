@@ -251,6 +251,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     // Making the remote the master source is the easy answer to all issues so far.
 
     setMode(3);
+    Check_radio();
 
     //get_Preamp_from_Radio(); // sync up with radio
     Preamp(-1); // -1 sets to database state. 2 is toggle state. 0 and 1 are Off and On.  Operate relays if any.
@@ -263,12 +264,23 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     //get_AGC_from_Radio();
     AGC(2);
     Check_radio();
+    
+    get_RIT_from_Radio();
+    //send_RIT_to_Radio();   // The offset for XIT and RIT is shared so call this for either one. Only 1 can be enabled at time and they use this value
+    get_RIT_ON_OFF_to_Radio();
+    //send_RIT_ON_OFF_to_Radio();
+    get_XIT_ON_OFF_to_Radio();
+    //send_XIT_ON_OFF_to_Radio();
 
     //get_Mode_from_Radio();
     modeList[bandmem[curr_band].mode_A].Width = bandmem[curr_band].filter_A;  // update width in table to current band last used.
     send_Mode_to_Radio(bandmem[curr_band].mode_A); // set to last known mode on this band
-    Check_radio();
-    
+
+    // will send this later when I add storage for it, for now just read it to prove it works.
+    get_DUP_from_Radio();
+    //send_DUP_to_Radio(void)
+    //delay(10);
+
     RefLevel(0); // 0 just updates things to be current value
     RFgain(0);
     AFgain(0);
@@ -838,8 +850,11 @@ COLD void Preamp(int8_t toggle)
 //  1 = ON  - turn off button highlight and center pan window
 //  2 = Toggle RIT ON/OFF state.
 //  3 = Zero RIT offset value
+//  4 = use dB state, do nto send to radio
 COLD void setRIT(int8_t toggle)
 {
+    CIVresult_t CIVresultL;
+
     // global rit_offset is used add to VFOA when displaying or reporting or setting frequency.
     // It never changes VFOA value to keep memory and band change complications.
     // Will be toggled between 0 and the offset value when active.
@@ -884,8 +899,16 @@ COLD void setRIT(int8_t toggle)
         if (toggle != -1) clearMeter();
     }
 
-    // DPRINTF("setRIT: Set RIT ON/OFF to "); DPRINTLN(bandmem[curr_band].RIT_en);
-    // DPRINTF("setRIT: Set RIT OFFSET to "); DPRINT(rit_offset); DPRINTF("  rit_offset_last = "); DPRINTLN(rit_offset_last);
+    if (toggle < 4 )
+    {
+            CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].RIT_en), CIV_wChk);
+            DPRINTF("Preamp: Send to Radio ON: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
+    
+    DPRINTF("setRIT: Set RIT ON/OFF to "); DPRINTLN(bandmem[curr_band].RIT_en);
+    DPRINTF("setRIT: Set RIT OFFSET to "); DPRINT(rit_offset); DPRINTF("  rit_offset_last = "); DPRINTLN(rit_offset_last);
+    
+    displayRIT();
 }
 
 // RIT offset control
@@ -2258,6 +2281,111 @@ COLD uint8_t send_AGC_to_Radio(void)
     return CIVresultL.value;
 }
 
+// Request frequency with the wakeup signal on to wake up a possibly sleeping radio 
+uint8_t send_CIV_WakeUp_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RADIO_ON].cmdData), CIV_D_NIX, CIV_wOn);
+    return CIVresultL.value;
+}
+
+// Used to request Duplex Offset status from radio
+COLD uint8_t get_DUP_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_DUPLEX_READ].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_DUP_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to send Duplex Offset to radio
+COLD uint8_t send_DUP_to_Radio(void)
+{
+    //CIVresult_t CIVresultL;
+    
+    //cmd_List[CIV_C_AGC_FAST].cmdData[3] = bandmem[curr_band].XXXXX;
+    //CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_DUPLEX_SEND].cmdData), CIV_D_NIX, CIV_wChk);
+    //DPRINTF("send_DUP_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //Check_radio();
+    //return CIVresultL.value;
+}
+
+// Used to request RIT Offset value from radio  -  This is also used for XIT Offset
+COLD uint8_t get_RIT_from_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_XIT].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_RIT_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to set RIT Offset status on radio  -  This is also used for XIT Offset
+COLD uint8_t send_RIT_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_XIT].cmdData), reinterpret_cast<const uint8_t*>(rit_offset), CIV_wChk);
+    DPRINTF("send_RIT_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT Offset = "); DPRINTLN(rit_offset);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to set RIT Offset status on radio
+COLD uint8_t send_RIT_ON_OFF_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    //cmd_List[CIV_C_RIT_ON_OFF].cmdData[3] = bandmem[curr_band].RIT_en;
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].RIT_en), CIV_wChk);
+    DPRINTF("send_RIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT On/Off = "); DPRINTLN(bandmem[curr_band].RIT_en);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to request RIT On of Off status from radio 
+COLD uint8_t get_RIT_ON_OFF_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_RIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to set XIT Offset status on radio
+COLD uint8_t send_XIT_ON_OFF_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_XIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].XIT_en), CIV_wChk);
+    DPRINTF("send_XIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  XIT On/Off = "); DPRINTLN(bandmem[curr_band].XIT_en);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
+// Used to request XIT On of Off status from radio
+COLD uint8_t get_XIT_ON_OFF_to_Radio(void)
+{
+    CIVresult_t CIVresultL;
+    
+    CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_XIT_ON_OFF].cmdData), CIV_D_NIX, CIV_wChk);
+    DPRINTF("get_XIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    delay(20);
+    Check_radio();
+    return CIVresultL.value;
+}
+
 // Very basic - outputs a set pattern for each band.  Follows the Elecraft K3 patther for combined HF and VHF used for transverters and antenna switching
 // This may control a external band decoder that accept wired inputs.  Other decoder outpout can be serial or ethernet
 void Band_Decode_Output(uint8_t band)
@@ -2322,8 +2450,6 @@ void PTT_Output(uint8_t band, uint8_t PTT_state)
     // Set your desired PTT pattern per band in RadioConfig.h
     // ToDo: Eventually create a local UI screen to edit and monitor pin states
 
-    PTT_state = (PTT_state > 0) ? PTT_state = 1 : PTT_state = 0;  // ensure it is 0 or 1
-
     DPRINTF("Band_Decode_Output: Band: "); DPRINTLN(band);
 
     switch (band)
@@ -2358,8 +2484,6 @@ void PTT_Output(uint8_t band, uint8_t PTT_state)
 
 void GPIO_PTT_Out(uint8_t pattern, uint8_t PTT_state)
 {
-    PTT_state = (PTT_state > 0) ? PTT_state = 1 : PTT_state = 0;  // ensure it is 0 or 1
-
     DPRINTF("  PTT state "); DPRINT(PTT_state, BIN);
     DPRINTF("  PTT Output Binary "); DPRINTLN(pattern & PTT_state, BIN);
 

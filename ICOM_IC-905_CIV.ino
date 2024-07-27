@@ -189,7 +189,7 @@ Metro CAT_Serial_Check     = Metro(20);     // Throttle the servicing for CAT co
 Metro CAT_Poll             = Metro(5000);  // Throttle the servicing for CAT comms
 Metro CAT_Log_Clear        = Metro(3000);   // Clear the CIV log buffer
 Metro CAT_Freq_Check       = Metro(60);   // Clear the CIV log buffer
-Metro CAT_RX_TX_Check      = Metro(300);   // Clear the CIV log buffer
+Metro CAT_RX_TX_Check      = Metro(500);   // Clear the CIV log buffer
 
 int64_t     xvtr_offset     = 0;
 int16_t     rit_offset      = 0;    // global RIT offset value in Hz. -9999Hz to +9999H
@@ -214,9 +214,12 @@ bool        touchBeep_flag  = false;
 uint8_t     popup           = 0;    // experimental flag for pop up windows
 static uint32_t delta       = 0;
 uint8_t     lpCnt           = 0;
-volatile uint8_t radio_mode   = 0;    // mode from radio messages
+volatile uint8_t radio_mode = 0;    // mode from radio messages
 uint8_t     radio_filter    = 0;    // filter from radio messages
 uint8_t     radio_data      = 0;    //  DATA on/off  from radio messages
+int16_t     radio_RIT       = 0;    // RIT offest 9.999KHz to -9.999KHz
+uint8_t     radio_RIT_On_Off = 0;
+int32_t     radio_DUP       = 0;    // Duplex Offset  
 
 // ************************************************* Setup *****************************************
 //
@@ -391,6 +394,8 @@ void setup()
     
     civ_905_setup();   
 
+    send_CIV_WakeUp_to_Radio();  // wake up the radio if it is sleeping
+    delay(100);
     civ.SetDTR(LOW);  // Drop DTR
     
     counter = 0;
@@ -570,7 +575,11 @@ void loop()
         newFreq = 0;
     }
 
-    if (CAT_RX_TX_Check.check() == 1) get_RXTX_from_Radio(); // poll the TX/RX state of the radio
+    if (CAT_RX_TX_Check.check() == 1) 
+    {
+        //get_RXTX_from_Radio(); // poll the TX/RX state of the radio
+        delay(10);
+    }
     
     Check_radio();
 
@@ -1369,55 +1378,69 @@ uint8_t Check_radio(void)
 
     if (ret_val) show_CIV_log();
     
-    if (ret_val == 1) // got frequency
+    switch(ret_val)
     {
-        if(VFOA_temp != VFOA)  // Update display if changed
-        {
-            // VFOA is already updated so find_band will see no change in freq so use previous VFO
-            
-            uint64_t bresult = find_new_band(VFOA, curr_band);  // find band index for VFOA frequency, don't change bands is VFO is in the current band
-            PC_Debug_port.printf("Check_radio: Old Freq: %llu  New Freq: %llu  FindBand result: %llu  Old band: %d  new band: %d\n", VFOA_temp, VFOA, bresult, curr_band_temp, curr_band);
-            
-            if (bresult && curr_band_temp != curr_band)   // if 0 then invalid band
-            {   
-                // now have curr_band updated to match the frequency so changebands() can do its work on the rest fo the parameters
-                DPRINT("Check_radio: New Band: "); DPRINTLN(curr_band);DPRINT("  VFOA:"); DPRINTLN(VFOA);
-                changeBands(0);  // set new band using current VFOA and curr_band sicne they are already updated
-            }
-            displayFreq();   // Update screen
-        }
-        VFOA_temp = VFOA;
-        curr_band_temp = curr_band;
-    }
-    else if (ret_val == 2)  // When the radio initiates a band change it sends out basic mode msg followed by frequency.  
-    // If we try to set the mode it will be for the old band.  So delay and wait for frequency, change band then deal with extended if needed.
-    // Requesting an extended (0x26) mode immediately aftere a basic mode is received, if this was a radio side band change, 
-    //     will clobber the frequency message from the radio.  Without the delay, the result is both the ext mode requeast and freq received are clobbered due to BUS_CONFLICT.
-    //
-    // A timer may need to be set to wait is do the ext mode to give time to see if this is part of a radio side band change
-    // If so can cancel the timer in band change and skip this one sicne it will be done there.
-    // For now trying a delay.  We need to know the extended if it was just a mode change on the same band.
-    {
-        DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
-        // Ignore this request and set mode in dB when we get the extended request which will after the frequency band changee
-        // delay sending extended mode request to radio if during a radio side band change this request will fail.
-        delay(30); // give time for frequency message to be received if this was leading off a radio side band change. A timer and flag would be better.
-        get_Mode_from_Radio();  // request extended data for DATA on/off state from radio
-    }
-    else if (ret_val == 4)
-    {
-        set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
-        DPRINTF("Check_radio: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
-    }
-    else if (ret_val == 5)  // RX TX status has changed, display the state
-    {
-        DPRINTF("Check_radio: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
-        displayXMIT();
-    }
-    else if (ret_val == 6 || ret_val == 7)  // RX TX status received
-    {
-        DPRINTF("Check_radio: TIME = "); DPRINTLN("time XXXXX");
-        displayTime();
+        // got frequency
+        case 1: if(VFOA_temp != VFOA)  // Update display if changed
+                {
+                    // VFOA is already updated so find_band will see no change in freq so use previous VFO
+                    
+                    uint64_t bresult = find_new_band(VFOA, curr_band);  // find band index for VFOA frequency, don't change bands is VFO is in the current band
+                    PC_Debug_port.printf("Check_radio: Old Freq: %llu  New Freq: %llu  FindBand result: %llu  Old band: %d  new band: %d\n", VFOA_temp, VFOA, bresult, curr_band_temp, curr_band);
+                    
+                    if (bresult && curr_band_temp != curr_band)   // if 0 then invalid band
+                    {   
+                        // now have curr_band updated to match the frequency so changebands() can do its work on the rest fo the parameters
+                        DPRINT("Check_radio: New Band: "); DPRINTLN(curr_band);DPRINT("  VFOA:"); DPRINTLN(VFOA);
+                        changeBands(0);  // set new band using current VFOA and curr_band sicne they are already updated
+                    }
+                    displayFreq();   // Update screen
+                }
+                VFOA_temp = VFOA;
+                curr_band_temp = curr_band;
+                break;
+
+        case 2: // When the radio initiates a band change it sends out basic mode msg followed by frequency.  
+                // If we try to set the mode it will be for the old band.  So delay and wait for frequency, change band then deal with extended if needed.
+                // Requesting an extended (0x26) mode immediately aftere a basic mode is received, if this was a radio side band change, 
+                //     will clobber the frequency message from the radio.  Without the delay, the result is both the ext mode requeast and freq received are clobbered due to BUS_CONFLICT.
+                //
+                // A timer may need to be set to wait is do the ext mode to give time to see if this is part of a radio side band change
+                // If so can cancel the timer in band change and skip this one sicne it will be done there.
+                // For now trying a delay.  We need to know the extended if it was just a mode change on the same band.
+                DPRINTF("Check_radio: Mode Basic = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINTLN(filter[radio_filter].Filter_name);
+                // Ignore this request and set mode in dB when we get the extended request which will after the frequency band changee
+                // delay sending extended mode request to radio if during a radio side band change this request will fail.
+                delay(30); // give time for frequency message to be received if this was leading off a radio side band change. A timer and flag would be better.
+                get_Mode_from_Radio();  // request extended data for DATA on/off state from radio
+                break;
+    
+        case 4: set_Mode_from_Radio(radio_mode);  // if got msg_type 2 so get info about DATA status
+                DPRINTF("Check_radio: Mode Extended = "); DPRINT(modeList[radio_mode].mode_label); DPRINTF(" Filter = "); DPRINT(filter[radio_filter].Filter_name); DPRINTF(" Data = "); DPRINTLN(radio_data);  
+                break;
+    
+        case 5: // RX TX status has changed, display the state
+                DPRINTF("Check_radio: RX TX = "); DPRINTLN(user_settings[user_Profile].xmit);
+                displayXMIT();
+                break;
+
+        case 6:
+        case 7: DPRINTF("Check_radio: TIME = "); DPRINTLN("time XXXXX");
+                displayTime();
+                break;
+   
+        case 11: DPRINTF("Check_radio: Duplex Offset = "); DPRINTLN(radio_DUP);
+                // ToDo:  Add DB field for Duplex +/-
+                break;
+
+        case 12: DPRINTF("Check_radio: RIT Offset = "); DPRINTLN(radio_RIT);
+                rit_offset = radio_RIT;
+                RIT(rit_offset);
+                break;
+        
+        case 13: DPRINTF("Check_radio: RIT On/Off: "); DPRINTLN(radio_RIT_On_Off);
+                setRIT(radio_RIT_On_Off);
+                break;
     }
     return ret_val;
 }

@@ -72,6 +72,17 @@ uint8_t get_Attn_from_Radio(void);
 uint8_t get_AGC_from_Radio(void);
 uint8_t send_AGC_to_Radio(void);
 uint64_t get_Freq_from_Radio(void);
+uint8_t send_CIV_WakeUp_to_Radio(void);
+uint8_t get_DUP_from_Radio(void);
+uint8_t send_DUP_to_Radio(void);
+uint8_t send_RIT_to_Radio(void);
+uint8_t get_RIT_from_Radio(void);
+uint8_t get_RIT_ON_OFF_to_Radio(void);
+uint8_t send_RIT_ON_OFF_to_Radio(void);
+uint8_t get_XIT_ON_OFF_to_Radio(void);
+uint8_t send_XIT_ON_OFF_to_Radio(void);
+
+
 void Band_Decode_Output(uint8_t band);
 void GPIO_Out(uint8_t pattern);
 void Decoder_GPIO_Pin_Setup(void);
