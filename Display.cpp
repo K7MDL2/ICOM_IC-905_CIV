@@ -219,7 +219,7 @@ COLD void displayFreq(void)
 			strcpy(vfo_str, formatVFO(VFOB+xit_offset));
 		ct = strlen(vfo_str);
 		ct1 = 14-ct;   // cal
-    	//DPRINT(" length of VFO_Str "); DPRINTLN(ct1);
+    	//DPRINT("displayFreq: length of VFO_Str "); DPRINTLN(ct1);
 		tft.setCursor(pVStby->bx+pVStby->padx+(ct1*VFOB_font_px_width), pVStby->by+pVStby->pady);
 		tft.setTextColor(pVStby->txt_clr);
 		tft.printf(vfo_str);	

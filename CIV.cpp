@@ -16,12 +16,14 @@ extern Metro CAT_Freq_Check;  // Clear the CIV log buffer
 extern uint8_t curr_band;  // global tracks our current band setting.
 extern uint64_t VFOA;      // 0 value should never be used more than 1st boot before EEPROM since init should read last used from table.
 extern uint64_t VFOB;
+extern uint64_t radio_VFO;      // temp for freq from radio.  Convert to Xvr freq if acting as IF for current band
 extern uint8_t radio_mode;      // mode from radio messages
 extern uint8_t radio_filter;    // filter from radio messages
 extern uint8_t radio_data;      // filter from radio messages
 extern int16_t radio_RIT;    	// RIT offest 9.999KHz to -9.999KHz from radio CI-V
 extern int32_t radio_DUP;		// Radio Duplex Offset
 extern uint8_t radio_RIT_On_Off;
+extern uint8_t radio_XIT_On_Off;
 extern uint8_t user_Profile;
 extern struct Band_Memory bandmem[];
 extern struct Modes_List modeList[];
@@ -193,7 +195,7 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 				case CIV_C_F1_SEND:
 				{  // command CIV_C_F_SEND received
 					//DPRINTF("check_CIV: CI-V Returned Frequency: "); DPRINTLN(CIVresultL.value);
-					VFOA = (uint64_t)CIVresultL.value;
+					radio_VFO = (uint64_t)CIVresultL.value;
 					msg_type = 1;
 					freqReceived = true;
 					break;
@@ -544,22 +546,32 @@ uint8_t check_CIV(uint32_t time_current_baseloop)
 					radio_RIT 		 = bcdByte(CIVresultL.datafield[2])* 100; // * -RIT_MINUS; 
 					radio_RIT  	    += bcdByte(CIVresultL.datafield[1]); 
 					radio_RIT = RIT_MINUS ?  radio_RIT*-1: radio_RIT;
-					DPRINTF("check_CIV: RIT Offset: "); DPRINT(radio_RIT); DPRINTLNF("Hz");
+					DPRINTF("check_CIV: RIT/XIT Offset: "); DPRINT(radio_RIT); DPRINTLNF("Hz");
 
 					msg_type = 12;
 					freqReceived = false;
 					break;
-				}  // RIT Offset
+				}  // RIT/XIT Offset
 
 				case CIV_C_RIT_ON_OFF:
 				{	// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
 					
 					radio_RIT_On_Off  	    = bcdByte(CIVresultL.datafield[1]); 
-					DPRINTF("check_CIV: RIT Offset: "); DPRINTLN(radio_RIT_On_Off);
-					msg_type = 12;
+					DPRINTF("check_CIV: RIT On/Off: "); DPRINTLN(radio_RIT_On_Off);
+					msg_type = 13;
 					freqReceived = false;
 					break;
-				}  // RIT Offset
+				}  // RIT On/Off
+
+				case CIV_C_XIT_ON_OFF:
+				{	// when using datafield, add 1 to prog guide index to account for first byte used as length counter - so 3 is 4 here.
+					
+					radio_XIT_On_Off  	    = bcdByte(CIVresultL.datafield[1]); 
+					DPRINTF("check_CIV: XIT On/Off: "); DPRINTLN(radio_XIT_On_Off);
+					msg_type = 14;
+					freqReceived = false;
+					break;
+				}  // XIT On/Off
 
 			}  // end switch
 			return msg_type;

@@ -40,6 +40,19 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
                                   // CIV_ADDR_9700   = 0xA2; // (Default-)address of the IC9700
                                   // CIV_ADDR_705    = 0xA4; // (Default-)address of the IC705
                                   // CIV_ADDR_905    = 0xAC; // (Default-)address of the IC905
+
+#define RESET_MEMORY 1      // 1 will write the compiled defaults database values into memory losing all saved data.  
+                            // 0 for normal use, operational values will be saved to storage (SD card if used or or EEPROM if used)
+                            // During dev this is usually enabled to deal with changes in data structures 
+
+                            // IC-905 CIV stuff
+#define GPS                 // Pass through USB Serial ch 'B' data   
+
+#define IFRIG               // If defined then this controller will be the master source of settings to the radio.  
+                            // This is required for transveter bands to reuse radio IF bands with each Xvtr band keeping its own settings separate
+                            // This is mostly targeted at ignoring frequency band changes from the radio as it would be unklnowsn what the real target band is,
+                            //     at least for bands that are used as IF bands.
+                            // This setting will add the virtual LO offset (xvtr offset) to the reported radio frequency to make VFOA freqwuency the Transveter frequency
                                   
 #define USE_RA8875          // Turns on support for RA8875 LCD Touchscreen Display with FT5204 Touch controller
                             // When commented out it will default to the RA8876 controller and FT5206 touch controller
@@ -230,9 +243,6 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
     //#define CESSB_IQMIXER
     //#define IQ_CORRECTION_WITH_CESSB  // turns on IQ correction to possibly help improve sideband image rejection due to hardware imbalances.
     
-    // IC-905 CIV stuff
-    #define GPS     // TPass through USB Serial ch 'B' data   
-
 #endif  // K7MDL_BUILD
 
 
@@ -255,18 +265,18 @@ OmniRig V1 RS-HFIQ compatible CAT control from an external PC.
 // The default IF is 10M band defined in the bandmem table in SDR_DATA.h
 #define ENABLE_6M_BAND    1  // if you hardware does 6M then edit the bandmem table in SDR_DATA.h
 #define ENABLE_144_BAND   1
-#define ENABLE_222_BAND   0
+#define ENABLE_222_BAND   1
 #define ENABLE_432_BAND   1
-#define ENABLE_902_BAND   0
-#define ENABLE_1296_BAND  0
-#define ENABLE_2400_BAND  0
+#define ENABLE_902_BAND   1
+#define ENABLE_1296_BAND  1
+#define ENABLE_2400_BAND  1
 #define ENABLE_3400_BAND  0
-#define ENABLE_5760_BAND  0
-#define ENABLE_10G_BAND   0
+#define ENABLE_5760_BAND  1
+#define ENABLE_10G_BAND   1
 #define ENABLE_24G_BAND   0
 #define ENABLE_47G_BAND   0
 #define ENABLE_76G_BAND   0
-#define ENABLE_122G_BAND  0
+#define ENABLE_122G_BAND  1
 
 //--------------------------USER HARDWARE AND PREFERENCES---------------------------------------
 //

@@ -151,7 +151,8 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     // TODO search bands column for match to account for mapping that does not start with 0 and bands could be in odd order and disabled.
 
     DPRINTF("\nchangeBands: Previous Band was "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  Current Freq: "); DPRINT(VFOA); 
-    DPRINTF("  Current Last_VFOA: "); DPRINT(bandmem[curr_band].vfo_A_last); DPRINTF("  Current Mode: "); DPRINTLN(bandmem[curr_band].mode_A);
+    DPRINTF("  Current Last_VFOA: "); DPRINT(bandmem[curr_band].vfo_A_last); DPRINTF("  Current Mode: "); DPRINT(bandmem[curr_band].mode_A);
+    DPRINTF("  Xvtr_Offset: "); DPRINTLN(xvtr_offset);
 
     target_band = bandmem[curr_band].band_num + direction;
     // target_band = curr_band + direction;    
@@ -187,14 +188,23 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     }
 
     curr_band = target_band; // We have a good band so can new band
-    DPRINTF("changeBands: curr_band is "); DPRINTLN(bandmem[curr_band].band_name); 
+    DPRINTF("changeBands: curr_band is "); DPRINT(bandmem[curr_band].band_name); DPRINTF("  Last used VFO on this band: "); DPRINTLN(bandmem[curr_band].vfo_A_last); 
 
     if (direction != 0)
-    {
-        VFOA = bandmem[curr_band].vfo_A_last; // last used frequencies
-        DPRINTF("changeBands: Direction not 0, Last used VFOA is "); DPRINTLN(VFOA);
+    {  // use this to get the last known frequency on a new band
+        if (find_new_band(bandmem[curr_band].vfo_A_last, curr_band))
+        {
+            VFOA = bandmem[curr_band].vfo_A_last; // last used frequencies
+            DPRINTF("changeBands: Direction not 0, Last used VFOA is "); DPRINTLN(VFOA);
+        }
+        else
+        {
+            DPRINTF("changeBands: ***** Direction not 0, failed to get Last used VFOA, likely wrong VFO value for this band ****"); DPRINTLN(VFOA);
+            VFOA = bandmem[curr_band].edge_lower;
+            DPRINTF("changeBands: ***** Defaulting to lower edge frequencing on current band: ");DPRINTLN(VFOA);
+        }
     }
-    else
+    else  // use this for when updating settings on same band
     {
         if (!find_new_band(VFOA, curr_band))  // returns 0 when out of band
         {
@@ -203,7 +213,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
         }
     }
     
-    // When changing bands alweays use the db modse_A and Filter A values.  These are the last used values on that band.  
+    // When changing bands always use the db modse_A and Filter A values.  These are the last used values on that band.  
     // The modeList table only remembers the last filter used for each mode and a new band may have diffent needs.  
     // The modList table will attempt to set the filter appropriate for a new mode on the same band using the last time that mode was used
     //   which could have been any band and a long time past.  But is the the best guess as some modes allows only FIL1 which using that woud cause all modes to be set to FIL 1.
@@ -214,6 +224,7 @@ COLD void changeBands(int8_t direction) // neg value is down.  Can jump multiple
     DPRINTF("changeBands: New Band is "); DPRINT(bandmem[curr_band].band_name); 
     DPRINTF("  New VFOA: "); DPRINT(VFOA); 
     DPRINTF("  xvtr_IF: "); DPRINT(bandmem[curr_band].xvtr_IF);
+    DPRINTF("  Xvtr_Offset: "); DPRINT(xvtr_offset);
     DPRINTF("  Mode:  "); DPRINT(bandmem[curr_band].mode_A);
     DPRINTF("  Filter: "); DPRINT(bandmem[curr_band].filter_A);
     DPRINTF("  modeList Filter: "); DPRINTLN(modeList[bandmem[curr_band].mode_A].Width);
@@ -328,8 +339,8 @@ COLD void setMode(int8_t dir)
 
     _mndx = (int8_t)bandmem[curr_band].mode_A; // get current mode
 
-    DPRINTF("setMode: Mode Index before change: "); DPRINT(bandmem[curr_band].mode_A);
-    DPRINTF(" Dir: "); DPRINTLN(dir);
+    //DPRINTF("setMode: Mode Index before change: "); DPRINT(bandmem[curr_band].mode_A);
+    //DPRINTF(" Dir: "); DPRINTLN(dir);
 
     if (dir < 2)
     {
@@ -358,7 +369,7 @@ COLD void setMode(int8_t dir)
         if (_mndx < 0) // limit in case of encoder counts
             _mndx = 0;    
 
-        DPRINTF("setMode: Mode Index changed to "); DPRINTLN(bandmem[curr_band].mode_A);
+        //DPRINTF("setMode: Mode Index changed to "); DPRINTLN(bandmem[curr_band].mode_A);
         bandmem[curr_band].mode_A = (uint8_t)_mndx; // store it
     }
 
@@ -929,10 +940,16 @@ COLD void RIT(int8_t delta)
 
         rit_offset = _offset; // store in the global RIT offset value
         if (bandmem[curr_band].RIT_en == ON)
+
             rit_offset_last = rit_offset; // only store when RIT is active, prevent false zero for things like delayed calls from S-meter box updates
 
         // DPRINTF(RIT: Set RIT OFFSET to "); DPRINT(rit_offset); DPRINTF("  rit_offset_last = "); DPRINTLN(rit_offset_last);
     }
+
+    // ToDo: Form up rit_offset to send
+    //CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(rit_offset), CIV_wChk);
+    //DPRINTF("XIT: Send to Radio XIT: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+
     selectFrequency(0); // no base freq change, just correct for RIT offset
     displayFreq();
     displayRIT();
@@ -945,8 +962,11 @@ COLD void RIT(int8_t delta)
 //  1 = ON  - turn off button highlight and center pan window
 //  2 = Toggle XIT ON/OFF state.
 //  3 = Zero XIT offset value
+//  4 = update XIT on/OFf, do not send to radio
 COLD void setXIT(int8_t toggle)
 {
+    CIVresult_t CIVresultL;
+
     // global xit_offset is used add to VFOA when displaying or reporting or setting frequency.
     // It never changes VFOA value to keep memory and band change complications.
     // Will be toggled between 0 and the offset value when active.
@@ -997,14 +1017,21 @@ COLD void setXIT(int8_t toggle)
         XIT(0); // update frequency
     }
 
-    // DPRINTF("setXIT: Set XIT ON/OFF to "); DPRINTLN(bandmem[curr_band].XIT_en);
-    // DPRINTF("setXIT: Set XIT OFFSET to "); DPRINT(xit_offset); DPRINTF("  xit_offset_last = "); DPRINTLN(xit_offset_last);
+    if (toggle < 4 )
+    {
+            CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].XIT_en), CIV_wChk);
+            DPRINTF("setXIT: Send to Radio XIT: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    }
+
+    DPRINTF("setXIT: Set XIT ON/OFF to "); DPRINTLN(bandmem[curr_band].XIT_en);
+    DPRINTF("setXIT: Set XIT OFFSET to "); DPRINT(xit_offset); DPRINTF("  xit_offset_last = "); DPRINTLN(xit_offset_last);
+    displayXIT();
 }
 
 // XIT offset control
 COLD void XIT(int8_t delta)
 {
-
+    //CIVresult_t CIVresultL;
     int16_t _offset;
 
     if (bandmem[curr_band].XIT_en == ON)
@@ -1023,6 +1050,11 @@ COLD void XIT(int8_t delta)
 
         //DPRINTF("XIT: Set XIT OFFSET to "); DPRINT(xit_offset); DPRINTF("  xit_offset_last = "); DPRINTLN(xit_offset_last);
     }
+
+    // ToDo: Form up xit_offset to send
+    //CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(xit_offset), CIV_wChk);
+    //DPRINTF("XIT: Send to Radio XIT: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    
     selectFrequency(0); // no base freq change, just correct for RIT offset
     displayFreq();
     displayXIT();
@@ -2006,14 +2038,13 @@ COLD void digital_step_attenuator_PE4302(int16_t _attn)
 // Changes to the correct band settings for the new target frequency.
 // If the new frequency is below or above the band limits it returns 0 else returns the new frequency
 //
-//#define DBG_BAND
+#define DBG_BAND
 HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
 {
     int i;
 
     #ifdef DBG_BAND
-        DPRINTF("find_band(): New Frequency requested = "); DPRINTLN(new_frequency);
-        DPRINTF("find_band(): New Band requested = "); DPRINTLN(_curr_band);
+        DPRINTF("find_band(): New Frequency requested = "); DPRINT(new_frequency); DPRINTF(" Current Band = "); DPRINTLN(_curr_band);
     #endif
 
     for (i=BANDS-1; i>=0; i--)    // start at the top and look for first band that VFOA fits under bandmem[i].edge_upper
@@ -2021,20 +2052,29 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
         #ifdef DBG_BAND
             DPRINTF("find_band(): Edge_Lower Search = "); DPRINTLN(bandmem[i].edge_lower);
         #endif
-        if (new_frequency >= bandmem[i].edge_lower && new_frequency <= bandmem[i].edge_upper) // found a band lower than new_frequency so search has ended
+
+        if ((new_frequency >= bandmem[i].edge_lower) && (new_frequency <= bandmem[i].edge_upper)) // found we are inside a band lower than new_frequency so search has ended
         {
             #ifdef DBG_BAND
                 DPRINTF("find_band(): Edge_Lower = "); DPRINTLN(bandmem[i].edge_lower);
             #endif
+
             _curr_band = bandmem[i].band_num;
+            
             #ifdef DBG_BAND
-                DPRINTF("find_band(): New Band = "); DPRINTLN(_curr_band);
+                DPRINTF("find_band(): Keep existing VFOA request and use New Band = "); DPRINTLN(_curr_band);
             #endif
+            
             //  Calculate frequency difference between the designated xvtr IF band's lower edge and the current VFO band's lower edge (the LO frequency).
-            //if (bandmem[*_curr_band].xvtr_IF)
-            //    xvtr_offset = bandmem[*_curr_band].edge_lower - bandmem[bandmem[*_curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
-            //else
-            //    xvtr_offset = 0;
+            if (bandmem[_curr_band].xvtr_IF)
+                xvtr_offset = bandmem[_curr_band].edge_lower - bandmem[bandmem[_curr_band].xvtr_IF].edge_lower; // if band is 144 then PLL will be set to VFOA-xvtr_offset
+            else
+                xvtr_offset = 0;
+            
+            #ifdef DBG_BAND
+                DPRINTF("find_band(): New Xvtr_offset = "); DPRINTLN(xvtr_offset);   // IS this happening twiew, always?  maybe redundant
+            #endif
+            
             if (bandmem[_curr_band].bandmap_en) // filter out disabled bands
                 return new_frequency;
             else
@@ -2043,10 +2083,37 @@ HOT uint64_t find_new_band(uint64_t new_frequency, uint8_t &_curr_band)
                 return 0;
             }
         }
+        else  // Go to the top of the next lower valid and enaqbled defined band  -- This may replace teh and search in changebands()
+        {
+            DPRINTF("find_band(): Look for a suitable lower band to use- start with: "); DPRINTLN(bandmem[i].band_name);
+            
+            for (uint8_t j = i; j > 0; j--)  //start at current band index i and search lower bands for valid option
+            {
+                DPRINTF("find_band(): Look for a suitable lower band to use: "); DPRINTLN(bandmem[j].band_name);
+                
+                if (new_frequency >= bandmem[j-1].edge_lower && new_frequency <= bandmem[j].edge_lower)   // find the next lowest valid band if we get a frequency request outside a defined band range
+                {
+                    // found a suitable lower band, correct VFOA to be in range using the edge_upper value
+                    _curr_band = bandmem[j-1].band_num;
+                    
+                    DPRINTF("find_band(): Found a possible lower band to use: "); DPRINTLN(bandmem[_curr_band].band_name);
+
+                    if (bandmem[_curr_band].bandmap_en)
+                    {
+                        new_frequency = bandmem[_curr_band].edge_upper-1;
+                        curr_band = _curr_band;
+                        #ifdef DBG_BAND
+                            DPRINTF("find_band(): Use next lowest band upper Frequency: "); DPRINT(new_frequency); DPRINTF(" New Band: "); DPRINTLN(_curr_band);
+                        #endif
+                        return new_frequency;
+                    }
+                }
+            }
+        }
     }
-    //#ifdef DBG_BAND
-       // DPRINTLNF("MAIN: Invalid Frequency Requested");
-    //#endif
+    #ifdef DBG_BAND
+        DPRINTLNF("MAIN: Invalid Frequency Requested");
+    #endif
     return 0; // 0 means frequency was not found in the table
 }
 
@@ -2056,7 +2123,7 @@ COLD uint8_t get_Mode_from_Radio(void)
     CIVresult_t CIVresultL_mode;
 
     CIVresultL_mode = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(cmd_List[CIV_C_F26A].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
+    //DPRINTF("get_Mode_from_Radio: retVal of Mode cmd writeMsg: "); DPRINTLN(retValStr[CIVresultL_mode.retVal]);
     Check_radio();
     return CIVresultL_mode.retVal;
 }
@@ -2064,7 +2131,7 @@ COLD uint8_t get_Mode_from_Radio(void)
 // Used to set remote's mode in the database to what the radio reported, usually by getmode()
 COLD void set_Mode_from_Radio(uint8_t mndx)   // Change Mode of the current active VFO by increment delta.
 {
-    DPRINTF("set_Mode_from_Radio: requests mode index ");  DPRINTLN(mndx);  
+    //DPRINTF("set_Mode_from_Radio: requests mode index ");  DPRINTLN(mndx);  
 
     if ((curr_band < BAND1296) && (mndx > MODES_NUM-3))  // DD and ATV not avaiable on bands < 1296
     {
@@ -2087,7 +2154,7 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
     CIVresult_t CIVresultL;
     uint8_t data_str[6] = {};
 
-    DPRINTF("send_Mode_to_Radio: requested mode "); DPRINT(modeList[mndx].mode_label);
+    //DPRINTF("send_Mode_to_Radio: requested mode "); DPRINT(modeList[mndx].mode_label);
     
     if ((curr_band < BAND1296) && (mndx > MODES_NUM - 3))  // DD and ATV not avaiable on bands < 1296
     {
@@ -2098,8 +2165,8 @@ COLD void send_Mode_to_Radio(uint8_t mndx)
 
     bandmem[curr_band].mode_A = mndx;  // set to the request allowed value
 
-    DPRINTF("send_Mode_to_Radio: Mode_A index = "); DPRINT(bandmem[curr_band].mode_A);
-    DPRINTF(" curr_band = "); DPRINTLN(bandmem[curr_band].band_name);
+    //DPRINTF("send_Mode_to_Radio: Mode_A index = "); DPRINT(bandmem[curr_band].mode_A);
+    //DPRINTF(" curr_band = "); DPRINTLN(bandmem[curr_band].band_name);
 
     if (modeList[mndx].data == 1)  // selected xxx-D modes needs DATA enabled on radio or not
         radio_data = bandmem[curr_band].data_A = 1;  // set DATA on or off 
@@ -2180,7 +2247,7 @@ COLD uint64_t get_Freq_from_Radio(void)   // Change Mode of the current active V
     CIVresult_t CIVresultL;
 
     CIVresultL = civ.writeMsg(CIV_ADDR, cmd_List[CIV_C_F_READ].cmdData, CIV_D_NIX, CIV_wChk);  // kick off freq request to update from radio
-    DPRINTF("get_Freq_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_Freq_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     //return CIVresultL.value;  // return 
     delay(20);
     Check_radio();
@@ -2224,7 +2291,7 @@ COLD uint8_t get_Preamp_from_Radio(void)
     if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
     {
         CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_PREAMP_READ].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        //DPRINTF("get_PreAmp_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
         delay(20);
         Check_radio();
         return CIVresultL.value;
@@ -2244,7 +2311,7 @@ COLD uint8_t get_Attn_from_Radio(void)
     if (curr_band < BAND2400)  // IC905 does not have Attn or Preamp on bands > 1296
     {
         CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_ATTN_READ].cmdData), CIV_D_NIX, CIV_wChk);
-        DPRINTF("get_Attn_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+        //DPRINTF("get_Attn_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
         delay(20);
         Check_radio();
         return CIVresultL.value;
@@ -2262,7 +2329,7 @@ COLD uint8_t get_AGC_from_Radio(void)
     CIVresult_t CIVresultL;
 
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_READ].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_AGC_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_AGC_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2275,7 +2342,7 @@ COLD uint8_t send_AGC_to_Radio(void)
     
     cmd_List[CIV_C_AGC_FAST].cmdData[3] = bandmem[curr_band].agc_mode;
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_AGC_FAST].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("send_AGC_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("send_AGC_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2296,7 +2363,7 @@ COLD uint8_t get_DUP_from_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_DUPLEX_READ].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_DUP_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_DUP_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2312,6 +2379,7 @@ COLD uint8_t send_DUP_to_Radio(void)
     //DPRINTF("send_DUP_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     //Check_radio();
     //return CIVresultL.value;
+    return 0;
 }
 
 // Used to request RIT Offset value from radio  -  This is also used for XIT Offset
@@ -2320,7 +2388,7 @@ COLD uint8_t get_RIT_from_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_XIT].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_RIT_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_RIT_from_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2332,7 +2400,7 @@ COLD uint8_t send_RIT_to_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_XIT].cmdData), reinterpret_cast<const uint8_t*>(rit_offset), CIV_wChk);
-    DPRINTF("send_RIT_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT Offset = "); DPRINTLN(rit_offset);
+    //DPRINTF("send_RIT_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT Offset = "); DPRINTLN(rit_offset);
     Check_radio();
     return CIVresultL.value;
 }
@@ -2344,7 +2412,7 @@ COLD uint8_t send_RIT_ON_OFF_to_Radio(void)
     
     //cmd_List[CIV_C_RIT_ON_OFF].cmdData[3] = bandmem[curr_band].RIT_en;
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].RIT_en), CIV_wChk);
-    DPRINTF("send_RIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT On/Off = "); DPRINTLN(bandmem[curr_band].RIT_en);
+    //DPRINTF("send_RIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  RIT On/Off = "); DPRINTLN(bandmem[curr_band].RIT_en);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2356,7 +2424,7 @@ COLD uint8_t get_RIT_ON_OFF_to_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_RIT_ON_OFF].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_RIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_RIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2368,7 +2436,7 @@ COLD uint8_t send_XIT_ON_OFF_to_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_XIT_ON_OFF].cmdData), reinterpret_cast<const uint8_t*>(&bandmem[curr_band].XIT_en), CIV_wChk);
-    DPRINTF("send_XIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  XIT On/Off = "); DPRINTLN(bandmem[curr_band].XIT_en);
+    //DPRINTF("send_XIT_ON_OFF_to_Radio: retVal: "); DPRINT(retValStr[CIVresultL.value]);  DPRINTF("  XIT On/Off = "); DPRINTLN(bandmem[curr_band].XIT_en);
     delay(20);
     Check_radio();
     return CIVresultL.value;
@@ -2380,7 +2448,7 @@ COLD uint8_t get_XIT_ON_OFF_to_Radio(void)
     CIVresult_t CIVresultL;
     
     CIVresultL = civ.writeMsg(CIV_ADDR, reinterpret_cast<const uint8_t*>(&cmd_List[CIV_C_XIT_ON_OFF].cmdData), CIV_D_NIX, CIV_wChk);
-    DPRINTF("get_XIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
+    //DPRINTF("get_XIT_ON_OFF_to_Radio: retVal: "); DPRINTLN(retValStr[CIVresultL.value]);
     delay(20);
     Check_radio();
     return CIVresultL.value;

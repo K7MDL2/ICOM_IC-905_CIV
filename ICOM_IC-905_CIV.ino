@@ -219,7 +219,9 @@ uint8_t     radio_filter    = 0;    // filter from radio messages
 uint8_t     radio_data      = 0;    //  DATA on/off  from radio messages
 int16_t     radio_RIT       = 0;    // RIT offest 9.999KHz to -9.999KHz
 uint8_t     radio_RIT_On_Off = 0;
+uint8_t     radio_XIT_On_Off = 0;
 int32_t     radio_DUP       = 0;    // Duplex Offset  
+uint64_t    radio_VFO       = 0;    // temp for freq from radio.  Convert to Xvr freq if actiog as IF for current band
 
 // ************************************************* Setup *****************************************
 //
@@ -421,7 +423,9 @@ void setup()
     // This would occur when you change the structures in SDR_DAta.h
     // You can force a clean default values write here.
     
-    //write_db_tables();   // comment out for normal operation.  Often best to leave in for dev.
+    if (RESET_MEMORY == 1)   // set this in RadioConfig.h.  1 will write the compiled defaults database values into memory losing all saved data.
+        write_db_tables();   // The read_db_tables will therefor see fresh values.  
+                             // comment out for normal operation.  Often best to leave in for dev.
 
     // Resume normal read user value into memory overwriting defaults.
     read_db_tables();              // Read in stored values to memory
@@ -465,7 +469,7 @@ void setup()
 
      DPRINT("Setup: curr_band = "); DPRINTLN(curr_band);
     
-    get_Freq_from_Radio();   // get freq from radio, comment this out if you want the remote database stored to rule
+    //get_Freq_from_Radio();   // get freq from radio, comment this out if you want the remote database stored to rule
     
     delay(400);
     
@@ -1370,33 +1374,72 @@ COLD void set_MF_Service(uint8_t new_client_name) // this will be the new owner 
 
 uint8_t Check_radio(void)
 {
-    static uint64_t VFOA_temp = 0;
+    static uint64_t VFOA_last = 0;
+    uint64_t VFO_temp = 0;
+
     static uint8_t curr_band_temp = 0;
     uint8_t ret_val = 0;
+    uint64_t bresult;
+    uint8_t _xvtr_IF;
+    //uint8_t curr_band_good = 0;
+    //uint8_t curr_IF_band_good = 0;
     
     ret_val = check_CIV(time_current_baseloop);  // got frequency
 
     if (ret_val) show_CIV_log();
-    
+
     switch(ret_val)
-    {
-        // got frequency
-        case 1: if(VFOA_temp != VFOA)  // Update display if changed
-                {
-                    // VFOA is already updated so find_band will see no change in freq so use previous VFO
-                    
-                    uint64_t bresult = find_new_band(VFOA, curr_band);  // find band index for VFOA frequency, don't change bands is VFO is in the current band
-                    PC_Debug_port.printf("Check_radio: Old Freq: %llu  New Freq: %llu  FindBand result: %llu  Old band: %d  new band: %d\n", VFOA_temp, VFOA, bresult, curr_band_temp, curr_band);
-                    
-                    if (bresult && curr_band_temp != curr_band)   // if 0 then invalid band
-                    {   
-                        // now have curr_band updated to match the frequency so changebands() can do its work on the rest fo the parameters
-                        DPRINT("Check_radio: New Band: "); DPRINTLN(curr_band);DPRINT("  VFOA:"); DPRINTLN(VFOA);
-                        changeBands(0);  // set new band using current VFOA and curr_band sicne they are already updated
-                    }
-                    displayFreq();   // Update screen
+    { 
+// If operating as master for transverter IF rig use, must disable changebands or compare freq to IF band and do nothing.  
+// could be problem with multiple xvtr bands sharing same if band and a change from the radio.
+        
+        //got frequency                  
+        case 1: if(VFOA_last != VFOA)  // Update display if changed
+                // If the radio tries to change bands when on a XVTR band, and the new frequency calculated becomes negative due to a high xvtr_offset, things can blow up.  
+                // Freq is a unsigned value. It then gets assigned to the values likke last VFO_A and causes crashes.  
+                // Resetting the memory at startup from defaults fixes this temporarily
+                // The solution is to never let that happen.  The radio_VFO (incoming frequency from radio) needs to be bounds checked.
+                // Can either send the radio back to the Xvtr band, or let is change bands to the direct, non-xvtr band. 
+                // Going to limit the radio to the current band limits. If it tries to go outside, we reset the radio back inbounds.
+             
+                DPRINTLN(""); DPRINT("*** VFOA change VFOA: "); DPRINT(VFOA); DPRINT("  radio VFO: "); DPRINT(radio_VFO); DPRINT("  Curr_band: "); DPRINTLN(curr_band);
+
+                _xvtr_IF = bandmem[curr_band].xvtr_IF;
+                
+                //  correct for transverter band offset
+                if (_xvtr_IF)
+                {    
+                    VFO_temp = radio_VFO + xvtr_offset;   // might have to consider adding in XIT or RIT like done in Tuner.cpp?
+
+                    DPRINT("Check_radio: Incoming VFO change:    XVTR Band      - VFO_temp: "); DPRINT(VFO_temp); DPRINT("  Radio VFO: "); DPRINT(radio_VFO); DPRINTF("  Band: "); DPRINT(bandmem[curr_band].band_name); DPRINT("  IF BAND: "); DPRINTLN(bandmem[_xvtr_IF].band_name);           
+
+                    if ( radio_VFO >= bandmem[_xvtr_IF].edge_upper)
+                        VFO_temp = bandmem[_xvtr_IF].edge_upper + xvtr_offset;
+                    else if (radio_VFO < bandmem[_xvtr_IF].edge_lower)
+                        VFO_temp = bandmem[_xvtr_IF].edge_lower + xvtr_offset;  // set possible VFOA and then verify it is still in the band
+                        
+                    DPRINTF("  lower IF: "); DPRINT(bandmem[_xvtr_IF].edge_lower); DPRINTF("  Upper IF: ");DPRINTLN(bandmem[_xvtr_IF].edge_upper);
+                
+                    //DPRINTF("Check_radio: IF BAND lower limit: "); DPRINT(bandmem[_xvtr_IF].edge_lower); DPRINTF("  radio_VFO "); DPRINT(radio_VFO); DPRINTF("  IF BAND upper limit: "); DPRINTLN(bandmem[_xvtr_IF].edge_upper);
                 }
-                VFOA_temp = VFOA;
+                else
+                {
+                    VFO_temp = radio_VFO;
+                    DPRINT("Check_radio: Incoming VFO change:   Non-XVTR Band    - VFO_temp: "); DPRINT(VFO_temp); DPRINT("  Radio VFO: "); DPRINT(radio_VFO); DPRINTF("  Band: "); DPRINTLN(bandmem[curr_band].band_name);
+                }    
+                
+                // Ensure we are in the normal band limits
+                if (VFO_temp >= bandmem[curr_band].edge_upper)
+                    VFO_temp = bandmem[curr_band].edge_upper-1;     
+                else if (VFO_temp < bandmem[curr_band].edge_lower) // limit VFO to band ends of current band
+                    VFO_temp = bandmem[curr_band].edge_lower;                
+ 
+                VFOA = VFO_temp;
+                PC_Debug_port.printf("Check_radio: VFO change - New Freq: %llu  FindBand result: N/A  Xvtr Offset %llu  Old band: %d  new band: %d\n", VFOA, xvtr_offset, curr_band_temp, curr_band);                   
+                selectFrequency(0);   // use 0 for 0 change to existing VFOA
+ 
+                DPRINTLN("Check_radio: Exit change VFO from radio\n");
+                VFOA_last = VFOA;
                 curr_band_temp = curr_band;
                 break;
 
@@ -1433,13 +1476,20 @@ uint8_t Check_radio(void)
                 // ToDo:  Add DB field for Duplex +/-
                 break;
 
-        case 12: DPRINTF("Check_radio: RIT Offset = "); DPRINTLN(radio_RIT);
-                rit_offset = radio_RIT;
+        case 12: DPRINTF("Check_radio: RIT/XIT Offset = "); DPRINTLN(radio_RIT);
+                xit_offset = rit_offset = radio_RIT;
                 RIT(rit_offset);
+                XIT(xit_offset);  // functon takes delta, not absolute to so fix this
                 break;
         
         case 13: DPRINTF("Check_radio: RIT On/Off: "); DPRINTLN(radio_RIT_On_Off);
-                setRIT(radio_RIT_On_Off);
+                bandmem[curr_band].RIT_en = radio_RIT_On_Off;
+                setRIT(4);
+                break;
+
+        case 14: DPRINTF("Check_radio: XIT On/Off: "); DPRINTLN(radio_XIT_On_Off);
+                bandmem[curr_band].XIT_en = radio_XIT_On_Off;
+                setXIT(4);
                 break;
     }
     return ret_val;

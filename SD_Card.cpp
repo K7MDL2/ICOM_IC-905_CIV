@@ -226,14 +226,14 @@ void write_db_tables(void)
             //SDR_sd_file.read(dataS, sizeof(dataS));  //read it back
             //memmove(&user_settings[0], dataS, sizeof(user_settings[i]));
 
-        Serial.println("\nClose File");
+        //Serial.println("\nClose File");
         SDR_sd_file.close();
         
-        Serial.println("Print Directory");
+        //Serial.println("Print Directory");
         SDR_sd_file = SD.open("/");
-        printDirectory(SDR_sd_file, 0);
+        //printDirectory(SDR_sd_file, 0);
         
-        Serial.println("Close Directory\n");
+        //Serial.println("Close Directory\n");
         SDR_sd_file.close();
     }  
     // if the file isn't open, pop up an error:
@@ -275,14 +275,14 @@ void read_db_tables(void)
         }
 
 
-        Serial.println("\nClose File");
+        //Serial.println("\nClose File");
         SDR_sd_file.close();
         
-        Serial.println("Print Directory");
+        //Serial.println("Print Directory");
         SDR_sd_file = SD.open("/");
-        printDirectory(SDR_sd_file, 0);
+        //printDirectory(SDR_sd_file, 0);
         
-        Serial.println("Close Directory\n");
+        //Serial.println("Close Directory\n");
         SDR_sd_file.close();
     }  
     // if the file isn't open, pop up an error:
@@ -304,9 +304,9 @@ bool write_radiocfg_h(void) // Standalone function wil create a file if needed a
         // don't do anything more:
         return false;
     }
-    Serial.println("SD Card initialized.");
+    //Serial.println("SD Card initialized.");
     
-    Serial.println("Open or Create our RadioCfg.h data file.");
+    //Serial.println("Open or Create our RadioCfg.h data file.");
     
     if (SD.exists("radiocfg.h")) 
     {

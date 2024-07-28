@@ -76,7 +76,7 @@ COLD void selectFrequency(int64_t newFreq)  // 0 = no change unless an offset is
 
 		Freq += Fc;
 		
-		DPRINTF("TUNER: VFOA = "); DPRINT(VFOA); DPRINTF("  PLL = "); DPRINT(Freq); DPRINTF("  Fc = "); DPRINT((int32_t) Fc); DPRINTF("  rit = "); DPRINT(rit_offset); DPRINTF("  xit = "); DPRINT(xit_offset); DPRINTF("  xvtr_offset = "); DPRINTLN(xvtr_offset);
+		DPRINTF("TUNER: VFOA = "); DPRINT(VFOA); DPRINTF("  Radio VFO = "); DPRINT(Freq); DPRINTF("  Fc = "); DPRINT((int32_t) Fc); DPRINTF("  rit = "); DPRINT(rit_offset); DPRINTF("  xit = "); DPRINT(xit_offset); DPRINTF("  xvtr_offset = "); DPRINTLN(xvtr_offset);
 	#endif
 
 	#ifdef PANADAPTER
